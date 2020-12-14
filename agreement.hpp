@@ -37,15 +37,14 @@ public:
 	{
 		std::multimap<weight, object, std::greater<weight>> rank;
 		std::unordered_map<object, weight> tally;
-		std::unordered_map<validator, std::pair<object, time_point>> votes;
+		std::unordered_map<validator, std::tuple<object, time_point, weight>> votes;
 
 		using vote = typename decltype(votes)::value_type;
 	private:
 		weight total_m{};
 		template<typename OP>
-		void order_update (validator const & validator, object const & object, OP op, validators const & validators)
+		void sort (weight const & weight, object const & object, OP op, validators const & validators)
 		{
-			auto weight = validators.weight (validator);
 			auto & weight_object = tally[object];
 			auto [current, end] = rank.equal_range (weight_object);
 			while (current != end&& current->second != object)
@@ -66,22 +65,23 @@ public:
 	public:
 		void erase (time_point const & fall, validator const & validator, object const & object, validators const & validators)
 		{
-			auto & [current, time] = votes[validator];
+			auto & [current, time, weight_l] = votes[validator];
 			if (fall == time && object == current)
 			{
-				order_update (validator, object, std::minus<weight> (), validators);
+				sort (weight_l, object, std::minus<weight> (), validators);
 				time = time_point{};
 			}
 		}
 		template<typename FAULT = decltype(fault_null)>
 		void insert (time_point const & rise, validator const & validator, object const & object, validators const & validators, FAULT const & fault = fault_null)
 		{
-			auto & [current, time] = votes[validator];
+			auto & [current, time, weight_l] = votes[validator];
 			if (time == time_point{})
 			{
 				current = object;
 				time = rise;
-				order_update (validator, object, std::plus<weight> (), validators);
+				weight_l = validators.weight (validator);
+				sort (weight_l, object, std::plus<weight> (), validators);
 			}
 			else if (current == object)
 			{
@@ -94,7 +94,7 @@ public:
 		}
 		bool empty () const
 		{
-			auto result = std::all_of (votes.begin (), votes.end (), [] (vote const & value) { return value.second.second == time_point{}; });
+			auto result = std::all_of (votes.begin (), votes.end (), [] (vote const & value) { return std::get<1>(value.second) == time_point{}; });
 			return result;
 		}
 		std::pair<weight, object> max () const
