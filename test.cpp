@@ -161,7 +161,7 @@ TEST (consensus_slate, insert_erase)
 	auto const & [weight2, object2] = slate.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	slate.erase (now, 0, 1.0, validators);
+	slate.erase (now, 0, 1.0);
 	ASSERT_TRUE (slate.empty ());
 	ASSERT_EQ (0, slate.total ());
 }
@@ -180,11 +180,11 @@ TEST (consensus_slate, insert_overlap)
 	auto const & [weight2, object2] = slate.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	slate.erase (now1, 0, 1.0, validators);
+	slate.erase (now1, 0, 1.0);
 	auto const & [weight3, object3] = slate.max ();
 	ASSERT_EQ (1, weight3);
 	ASSERT_EQ (1.0, object3);
-	slate.erase (now2, 0, 1.0, validators);
+	slate.erase (now2, 0, 1.0);
 	ASSERT_TRUE (slate.empty ());
 }
 
@@ -198,14 +198,14 @@ TEST (consensus_slate, insert_double)
 	auto const & [weight1, object1] = slate.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	slate.erase (now1, 0, 1.0, validators);
+	slate.erase (now1, 0, 1.0);
 	auto const & [weight3, object3] = slate.max ();
 	ASSERT_TRUE (slate.empty ());
 	slate.insert (now2, 0, 1.0, validators);
 	auto const & [weight2, object2] = slate.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	slate.erase (now2, 0, 1.0, validators);
+	slate.erase (now2, 0, 1.0);
 	ASSERT_TRUE (slate.empty ());
 }
 
@@ -223,11 +223,11 @@ TEST (consensus_slate, insert_different)
 	auto const & [weight2, object2] = slate.max ();
 	ASSERT_EQ (2, weight2);
 	ASSERT_EQ (1.0, object2);
-	slate.erase (now1, 0, 1.0, validators);
+	slate.erase (now1, 0, 1.0);
 	auto const & [weight3, object3] = slate.max ();
 	ASSERT_EQ (1, weight3);
 	ASSERT_EQ (1.0, object3);
-	slate.erase (now2, 1, 1.0, validators);
+	slate.erase (now2, 1, 1.0);
 	ASSERT_TRUE (slate.empty ());
 }
 
@@ -249,10 +249,10 @@ TEST (consensus_slate, fault)
 	auto const & [weight2, object2] = slate.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	slate.erase (now1, 0, 1.0, validators);
+	slate.erase (now1, 0, 1.0);
 	auto const & [weight3, object3] = slate.max ();
 	ASSERT_TRUE (slate.empty ());
-	slate.erase (now2, 0, 2.0, validators);
+	slate.erase (now2, 0, 2.0);
 	ASSERT_TRUE (slate.empty ());
 }
 
@@ -265,10 +265,10 @@ TEST (consensus_slate, fault_identical)
 	slate.insert (now1, 0, 1.0, validators);
 	slate.insert (now2, 0, 2.0, validators);
 	slate.insert (now2, 0, 1.0, validators);
-	slate.erase (now1, 0, 1.0, validators);
-	slate.erase (now2, 0, 2.0, validators);
+	slate.erase (now1, 0, 1.0);
+	slate.erase (now2, 0, 2.0);
 	ASSERT_FALSE (slate.empty ());
-	slate.erase (now2, 0, 1.0, validators);
+	slate.erase (now2, 0, 1.0);
 	ASSERT_TRUE (slate.empty ());
 }
 
@@ -281,10 +281,10 @@ TEST (consensus_slate, fault_covered)
 	auto now3 = incrementing_clock::now ();
 	slate.insert (now1, 0, 1.0, validators);
 	slate.insert (now2, 0, 2.0, validators);
-	slate.erase (now1, 0, 1.0, validators);
+	slate.erase (now1, 0, 1.0);
 	slate.insert (now3, 0, 2.0, validators);
-	slate.erase (now2, 0, 2.0, validators);
-	slate.erase (now3, 0, 2.0, validators);
+	slate.erase (now2, 0, 2.0);
+	slate.erase (now3, 0, 2.0);
 }
 
 TEST (consensus_slate, insert_flip)
@@ -297,13 +297,13 @@ TEST (consensus_slate, insert_flip)
 	auto const & [weight1, object1] = slate.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	slate.erase (now1, 0, 1.0, validators);
+	slate.erase (now1, 0, 1.0);
 	ASSERT_TRUE (slate.empty ());
 	slate.insert (now2, 0, 2.0, validators);
 	auto const & [weight2, object2] = slate.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (2.0, object2);
-	slate.erase (now2, 0, 2.0, validators);
+	slate.erase (now2, 0, 2.0);
 	ASSERT_TRUE (slate.empty ());
 }
 
@@ -318,7 +318,7 @@ TEST (consensus_slate, insert_flip_fault)
 	auto const & [weight1, object1] = slate.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	slate.erase (now1, 0, 1.0, validators);
+	slate.erase (now1, 0, 1.0);
 	ASSERT_TRUE (slate.empty ());
 	slate.insert (now2, 0, 2.0, validators);
 	auto const & [weight2, object2] = slate.max ();
@@ -328,7 +328,7 @@ TEST (consensus_slate, insert_flip_fault)
 	auto const & [weight3, object3] = slate.max ();
 	ASSERT_EQ (1, weight3);
 	ASSERT_EQ (2.0, object3);
-	slate.erase (now2, 0, 2.0, validators);
+	slate.erase (now2, 0, 2.0);
 	ASSERT_TRUE (slate.empty ());
 }
 

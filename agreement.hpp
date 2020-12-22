@@ -43,7 +43,7 @@ public:
 	private:
 		weight total_m{};
 		template<typename OP>
-		void sort (weight const & weight, object const & object, OP op, validators const & validators)
+		void sort (weight const & weight, object const & object, OP op)
 		{
 			auto & weight_object = tally[object];
 			auto [current, end] = rank.equal_range (weight_object);
@@ -63,12 +63,12 @@ public:
 			total_m = op (total_m, weight);
 		}
 	public:
-		void erase (time_point const & fall, validator const & validator, object const & object, validators const & validators)
+		void erase (time_point const & fall, validator const & validator, object const & object)
 		{
 			auto & [current, time, weight_l] = votes[validator];
 			if (fall == time && object == current)
 			{
-				sort (weight_l, object, std::minus<weight> (), validators);
+				sort (weight_l, object, std::minus<weight> ());
 				time = time_point{};
 			}
 		}
@@ -81,7 +81,7 @@ public:
 				current = object;
 				time = rise;
 				weight_l = validators.weight (validator);
-				sort (weight_l, object, std::plus<weight> (), validators);
+				sort (weight_l, object, std::plus<weight> ());
 			}
 			else if (current == object)
 			{
@@ -187,7 +187,7 @@ public:
 			{
 				auto const & [time, value] = *lower;
 				auto const & [validator, object] = value;
-				slate.erase (time, validator, object, validators);
+				slate.erase (time, validator, object);
 				++lower;
 			}
 			slate.insert (time, validator, object, validators, fault);
