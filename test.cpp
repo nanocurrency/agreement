@@ -926,7 +926,7 @@ TEST (consensus, fuzz)
 	class shared
 	{
 	public:
-		std::unordered_set<uint16_t> confirmed;
+		std::unordered_set<bool> confirmed;
 		class vote
 		{
 		public:
@@ -959,15 +959,14 @@ TEST (consensus, fuzz)
 		{
 			std::lock_guard<std::mutex> lock (mutex);
 			messages.push_back ({ obj, time, self });
-		};
+		}
 		void confirm (decltype(confirmed)::value_type value)
 		{
 			std::lock_guard<std::mutex> lock (mutex);
 			confirmed.insert (value);
-			ASSERT_EQ (1, confirmed.size ());
-		};
+		}
 	};
-	std::uniform_int_distribution<uint64_t> dist (0, 65535);
+	std::uniform_int_distribution<uint64_t> dist (0, 1);
 	class consensus
 	{
 	public:
@@ -988,7 +987,7 @@ TEST (consensus, fuzz)
 		{
 			return self < ((validators.size () - 1) / 3);
 		}
-		void record (uint16_t const & obj)
+		void record (bool const & obj)
 		{
 			if (history.empty () || history.back () != obj)
 			{
@@ -1013,7 +1012,7 @@ TEST (consensus, fuzz)
 			std::lock_guard<std::mutex> lock (mutex);
 			auto message = shared.get ();
 			item->insert (message.obj, message.time, message.validator);
-			item->tally (message.time, message.time, validators, [this] (uint16_t const & value) { agreement = value; });
+			item->tally (message.time, message.time, validators, [this] (bool const & value) { agreement = value; });
 			if (!set && agreement.has_value ())
 			{
 				shared.confirm (agreement.value ());
@@ -1046,14 +1045,14 @@ TEST (consensus, fuzz)
 		}
 		std::mutex mutex;
 		std::chrono::milliseconds const W;
-		std::uniform_int_distribution<uint64_t> dist{ 0, 65535 };
+		std::uniform_int_distribution<uint64_t> dist{ 0, 1 };
 		uniform_validators & validators;
 		shared & shared;
 		unsigned self;
-		std::optional<float> agreement;
+		std::optional<bool> agreement;
 		std::shared_ptr<agreement_short_sys_t> item;
-		std::deque<uint16_t> history;
-		std::function<void(uint16_t const & obj, std::chrono::system_clock::time_point const & time)> add;
+		std::deque<bool> history;
+		std::function<void(bool const & obj, std::chrono::system_clock::time_point const & time)> add;
 		bool set{ false };
 		std::atomic<size_t> & done;
 		std::chrono::system_clock::time_point last;
@@ -1078,7 +1077,11 @@ TEST (consensus, fuzz)
 			}
 		});
 	}
-	std::for_each(threads.begin (), threads.end (), [] (std::thread & thread) {
+	std::for_each (threads.begin (), threads.end (), [] (std::thread & thread) {
 		thread.join ();
 	});
+	std::for_each (agreements.begin (), agreements.end (), [] (consensus & item) {
+		item.dump ();
+	});
+	ASSERT_EQ (1, shared.confirmed.size ());
 }
