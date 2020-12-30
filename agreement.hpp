@@ -33,10 +33,10 @@ private:
 	static void fault_null (validator const &) {};
 	static void confirm_null (object const &) {};
 public:
-	class slate
+	class tally
 	{
 		std::multimap<weight, object, std::greater<weight>> rank;
-		std::unordered_map<object, weight> tally;
+		std::unordered_map<object, weight> totals;
 		std::unordered_map<validator, std::tuple<object, time_point, weight>> votes;
 
 		using vote = typename decltype(votes)::value_type;
@@ -45,7 +45,7 @@ public:
 		template<typename OP>
 		void sort (weight const & weight, object const & object, OP op)
 		{
-			auto & weight_object = tally[object];
+			auto & weight_object = totals[object];
 			auto [current, end] = rank.equal_range (weight_object);
 			while (current != end&& current->second != object)
 			{
@@ -58,15 +58,15 @@ public:
 			}
 			auto weight_new = op (weight_object, weight);
 			rank.insert (std::make_pair (weight_new, object));
-			assert (tally.size () == rank.size ());
+			assert (totals.size () == rank.size ());
 			weight_object = weight_new;
 			total_m = op (total_m, weight);
 		}
 	public:
-		void erase (time_point const & fall, validator const & validator, object const & object)
+		void erase (time_point const & rise, validator const & validator, object const & object)
 		{
 			auto & [current, time, weight_l] = votes[validator];
-			if (fall == time && object == current)
+			if (rise == time && object == current)
 			{
 				sort (weight_l, object, std::minus<weight> ());
 				time = time_point{};
@@ -113,7 +113,7 @@ public:
 		void clear ()
 		{
 			votes.clear ();
-			tally.clear ();
+			totals.clear ();
 			rank.clear ();
 			total_m = weight{};
 		}
@@ -174,7 +174,7 @@ public:
 		parents.insert (parent);
 	}
 	template<typename FAULT>
-	void tally_slates (slate & slate, time_point const & begin, time_point const & end, validators const & validators, FAULT const & fault = fault_null)
+	void scan (tally & tally, time_point const & begin, time_point const & end, validators const & validators, FAULT const & fault = fault_null)
 	{
 		auto current = votes.lower_bound (begin);
 		auto lower = current;
@@ -187,10 +187,10 @@ public:
 			{
 				auto const & [time, value] = *lower;
 				auto const & [validator, object] = value;
-				slate.erase (time, validator, object);
+				tally.erase (time, validator, object);
 				++lower;
 			}
-			slate.insert (time, validator, object, validators, fault);
+			tally.insert (time, validator, object, validators, fault);
 			++current;
 		}
 	}
@@ -201,9 +201,9 @@ public:
 	template<typename CONFIRM = decltype(confirm_null), typename FAULT = decltype(fault_null)>
 	void tally (time_point const & begin, time_point const & end, validators const & validators, CONFIRM const & confirm = confirm_null, FAULT const & fault = fault_null)
 	{
-		class slate slate;
-		tally_slates (slate, begin - W + duration{ 1 }, end + W, validators, fault);
-		auto const & [weight, object] = slate.max ();
+		class tally tally;
+		scan (tally, begin - W + duration{ 1 }, end + W, validators, fault);
+		auto const & [weight, object] = tally.max ();
 		if (weight >= validators.quorum ())
 		{
 			confirm (object);
@@ -215,11 +215,11 @@ public:
 	time_point vote (VoteFunction const & vote, validators const & validators, time_point const & now = clock::now (), FAULT const & fault = fault_null)
 	{
 		votes.erase (votes.begin (), votes.upper_bound (now - W));
-		class slate slate;
-		tally_slates (slate, now - W, now, validators, fault);
-		auto const & [weight, object] = slate.max ();
+		class tally tally;
+		scan (tally, now - W, now, validators, fault);
+		auto const & [weight, object] = tally.max ();
 		auto result = now + W;
-		if (slate.total () >= validators.quorum () && last != object)
+		if (tally.total () >= validators.quorum () && last != object)
 		{
 			auto when = replaceable ();
 			if (when <= now)

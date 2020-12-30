@@ -141,94 +141,94 @@ TEST (consensus_validator, non_convertable)
 
 TEST (consensus_slate, construction)
 {
-	class agreement_u_t::slate slate;
-	ASSERT_TRUE (slate.empty ());
-	ASSERT_EQ (0, slate.total ());
-	slate.clear ();
+	class agreement_u_t::tally tally;
+	ASSERT_TRUE (tally.empty ());
+	ASSERT_EQ (0, tally.total ());
+	tally.clear ();
 }
 
 TEST (consensus_slate, insert_erase)
 {
 	uniform_validators validators{ 3 };
-	class agreement_u_t::slate slate;
-	auto const & [weight1, object1] = slate.max ();
+	class agreement_u_t::tally tally;
+	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (0, weight1);
 	ASSERT_EQ (0.0, object1);
 	auto now = incrementing_clock::now ();
-	ASSERT_EQ (0, slate.total ());
-	slate.insert (now, 0, 1.0, validators);
-	ASSERT_EQ (1, slate.total ());
-	auto const & [weight2, object2] = slate.max ();
+	ASSERT_EQ (0, tally.total ());
+	tally.insert (now, 0, 1.0, validators);
+	ASSERT_EQ (1, tally.total ());
+	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	slate.erase (now, 0, 1.0);
-	ASSERT_TRUE (slate.empty ());
-	ASSERT_EQ (0, slate.total ());
+	tally.erase (now, 0, 1.0);
+	ASSERT_TRUE (tally.empty ());
+	ASSERT_EQ (0, tally.total ());
 }
 
 TEST (consensus_slate, insert_overlap)
 {
 	uniform_validators validators{ 3 };
-	class agreement_u_t::slate slate;
+	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = now1 + one;
-	slate.insert (now1, 0, 1.0, validators);
-	auto const & [weight1, object1] = slate.max ();
+	tally.insert (now1, 0, 1.0, validators);
+	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	slate.insert (now2, 0, 1.0, validators);
-	auto const & [weight2, object2] = slate.max ();
+	tally.insert (now2, 0, 1.0, validators);
+	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	slate.erase (now1, 0, 1.0);
-	auto const & [weight3, object3] = slate.max ();
+	tally.erase (now1, 0, 1.0);
+	auto const & [weight3, object3] = tally.max ();
 	ASSERT_EQ (1, weight3);
 	ASSERT_EQ (1.0, object3);
-	slate.erase (now2, 0, 1.0);
-	ASSERT_TRUE (slate.empty ());
+	tally.erase (now2, 0, 1.0);
+	ASSERT_TRUE (tally.empty ());
 }
 
 TEST (consensus_slate, insert_double)
 {
 	uniform_validators validators{ 3 };
-	class agreement_u_t::slate slate;
+	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
-	slate.insert (now1, 0, 1.0, validators);
-	auto const & [weight1, object1] = slate.max ();
+	tally.insert (now1, 0, 1.0, validators);
+	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	slate.erase (now1, 0, 1.0);
-	auto const & [weight3, object3] = slate.max ();
-	ASSERT_TRUE (slate.empty ());
-	slate.insert (now2, 0, 1.0, validators);
-	auto const & [weight2, object2] = slate.max ();
+	tally.erase (now1, 0, 1.0);
+	auto const & [weight3, object3] = tally.max ();
+	ASSERT_TRUE (tally.empty ());
+	tally.insert (now2, 0, 1.0, validators);
+	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	slate.erase (now2, 0, 1.0);
-	ASSERT_TRUE (slate.empty ());
+	tally.erase (now2, 0, 1.0);
+	ASSERT_TRUE (tally.empty ());
 }
 
 TEST (consensus_slate, insert_different)
 {
 	uniform_validators validators{ 3 };
-	class agreement_u_t::slate slate;
+	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
-	slate.insert (now1, 0, 1.0, validators);
-	auto const & [weight1, object1] = slate.max ();
+	tally.insert (now1, 0, 1.0, validators);
+	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	slate.insert (now2, 1, 1.0, validators);
-	auto const & [weight2, object2] = slate.max ();
+	tally.insert (now2, 1, 1.0, validators);
+	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (2, weight2);
 	ASSERT_EQ (1.0, object2);
-	slate.erase (now1, 0, 1.0);
-	auto const & [weight3, object3] = slate.max ();
+	tally.erase (now1, 0, 1.0);
+	auto const & [weight3, object3] = tally.max ();
 	ASSERT_EQ (1, weight3);
 	ASSERT_EQ (1.0, object3);
-	slate.erase (now2, 1, 1.0);
-	ASSERT_TRUE (slate.empty ());
+	tally.erase (now2, 1, 1.0);
+	ASSERT_TRUE (tally.empty ());
 }
 
 TEST (consensus_slate, fault)
@@ -236,100 +236,100 @@ TEST (consensus_slate, fault)
 	std::deque<agreement_u_t::validator> faults;
 	auto fault = [&faults] (agreement_u_t::validator const & value) { faults.push_back(value); };
 	uniform_validators validators{ 3 };
-	class agreement_u_t::slate slate;
+	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
-	slate.insert (now1, 0, 1.0, validators, fault);
-	auto const & [weight1, object1] = slate.max ();
+	tally.insert (now1, 0, 1.0, validators, fault);
+	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	slate.insert (now2, 0, 2.0, validators, fault);
+	tally.insert (now2, 0, 2.0, validators, fault);
 	ASSERT_EQ (1, faults.size ());
 	ASSERT_EQ (0, faults[0]);
-	auto const & [weight2, object2] = slate.max ();
+	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	slate.erase (now1, 0, 1.0);
-	auto const & [weight3, object3] = slate.max ();
-	ASSERT_TRUE (slate.empty ());
-	slate.erase (now2, 0, 2.0);
-	ASSERT_TRUE (slate.empty ());
+	tally.erase (now1, 0, 1.0);
+	auto const & [weight3, object3] = tally.max ();
+	ASSERT_TRUE (tally.empty ());
+	tally.erase (now2, 0, 2.0);
+	ASSERT_TRUE (tally.empty ());
 }
 
 TEST (consensus_slate, fault_identical)
 {
 	uniform_validators validators{ 3 };
-	class agreement_u_t::slate slate;
+	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = now1 + one;
-	slate.insert (now1, 0, 1.0, validators);
-	slate.insert (now2, 0, 2.0, validators);
-	slate.insert (now2, 0, 1.0, validators);
-	slate.erase (now1, 0, 1.0);
-	slate.erase (now2, 0, 2.0);
-	ASSERT_FALSE (slate.empty ());
-	slate.erase (now2, 0, 1.0);
-	ASSERT_TRUE (slate.empty ());
+	tally.insert (now1, 0, 1.0, validators);
+	tally.insert (now2, 0, 2.0, validators);
+	tally.insert (now2, 0, 1.0, validators);
+	tally.erase (now1, 0, 1.0);
+	tally.erase (now2, 0, 2.0);
+	ASSERT_FALSE (tally.empty ());
+	tally.erase (now2, 0, 1.0);
+	ASSERT_TRUE (tally.empty ());
 }
 
 TEST (consensus_slate, fault_covered)
 {
 	uniform_validators validators{ 3 };
-	class agreement_u_t::slate slate;
+	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
 	auto now3 = incrementing_clock::now ();
-	slate.insert (now1, 0, 1.0, validators);
-	slate.insert (now2, 0, 2.0, validators);
-	slate.erase (now1, 0, 1.0);
-	slate.insert (now3, 0, 2.0, validators);
-	slate.erase (now2, 0, 2.0);
-	slate.erase (now3, 0, 2.0);
+	tally.insert (now1, 0, 1.0, validators);
+	tally.insert (now2, 0, 2.0, validators);
+	tally.erase (now1, 0, 1.0);
+	tally.insert (now3, 0, 2.0, validators);
+	tally.erase (now2, 0, 2.0);
+	tally.erase (now3, 0, 2.0);
 }
 
 TEST (consensus_slate, insert_flip)
 {
 	uniform_validators validators{ 3 };
-	class agreement_u_t::slate slate;
+	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
-	slate.insert (now1, 0, 1.0, validators);
-	auto const & [weight1, object1] = slate.max ();
+	tally.insert (now1, 0, 1.0, validators);
+	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	slate.erase (now1, 0, 1.0);
-	ASSERT_TRUE (slate.empty ());
-	slate.insert (now2, 0, 2.0, validators);
-	auto const & [weight2, object2] = slate.max ();
+	tally.erase (now1, 0, 1.0);
+	ASSERT_TRUE (tally.empty ());
+	tally.insert (now2, 0, 2.0, validators);
+	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (2.0, object2);
-	slate.erase (now2, 0, 2.0);
-	ASSERT_TRUE (slate.empty ());
+	tally.erase (now2, 0, 2.0);
+	ASSERT_TRUE (tally.empty ());
 }
 
 TEST (consensus_slate, insert_flip_fault)
 {
 	uniform_validators validators{ 3 };
-	class agreement_u_t::slate slate;
+	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
 	auto now3 = incrementing_clock::now ();
-	slate.insert (now1, 0, 1.0, validators);
-	auto const & [weight1, object1] = slate.max ();
+	tally.insert (now1, 0, 1.0, validators);
+	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	slate.erase (now1, 0, 1.0);
-	ASSERT_TRUE (slate.empty ());
-	slate.insert (now2, 0, 2.0, validators);
-	auto const & [weight2, object2] = slate.max ();
+	tally.erase (now1, 0, 1.0);
+	ASSERT_TRUE (tally.empty ());
+	tally.insert (now2, 0, 2.0, validators);
+	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (2.0, object2);
-	slate.insert (now3, 0, 1.0, validators);
-	auto const & [weight3, object3] = slate.max ();
+	tally.insert (now3, 0, 1.0, validators);
+	auto const & [weight3, object3] = tally.max ();
 	ASSERT_EQ (1, weight3);
 	ASSERT_EQ (2.0, object3);
-	slate.erase (now2, 0, 2.0);
-	ASSERT_TRUE (slate.empty ());
+	tally.erase (now2, 0, 2.0);
+	ASSERT_TRUE (tally.empty ());
 }
 
 TEST (consensus_validator, construction)
