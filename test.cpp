@@ -156,12 +156,12 @@ TEST (consensus_slate, insert_erase)
 	ASSERT_EQ (0.0, object1);
 	auto now = incrementing_clock::now ();
 	ASSERT_EQ (0, tally.total ());
-	tally.insert (now, 0, 1.0, validators);
+	tally.rise (now, 0, 1.0, validators);
 	ASSERT_EQ (1, tally.total ());
 	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	tally.erase (now, 0, 1.0);
+	tally.fall (now, 0, 1.0);
 	ASSERT_TRUE (tally.empty ());
 	ASSERT_EQ (0, tally.total ());
 }
@@ -172,19 +172,19 @@ TEST (consensus_slate, insert_overlap)
 	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = now1 + one;
-	tally.insert (now1, 0, 1.0, validators);
+	tally.rise (now1, 0, 1.0, validators);
 	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	tally.insert (now2, 0, 1.0, validators);
+	tally.rise (now2, 0, 1.0, validators);
 	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	tally.erase (now1, 0, 1.0);
+	tally.fall (now1, 0, 1.0);
 	auto const & [weight3, object3] = tally.max ();
 	ASSERT_EQ (1, weight3);
 	ASSERT_EQ (1.0, object3);
-	tally.erase (now2, 0, 1.0);
+	tally.fall (now2, 0, 1.0);
 	ASSERT_TRUE (tally.empty ());
 }
 
@@ -194,18 +194,18 @@ TEST (consensus_slate, insert_double)
 	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
-	tally.insert (now1, 0, 1.0, validators);
+	tally.rise (now1, 0, 1.0, validators);
 	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	tally.erase (now1, 0, 1.0);
+	tally.fall (now1, 0, 1.0);
 	auto const & [weight3, object3] = tally.max ();
 	ASSERT_TRUE (tally.empty ());
-	tally.insert (now2, 0, 1.0, validators);
+	tally.rise (now2, 0, 1.0, validators);
 	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	tally.erase (now2, 0, 1.0);
+	tally.fall (now2, 0, 1.0);
 	ASSERT_TRUE (tally.empty ());
 }
 
@@ -215,19 +215,19 @@ TEST (consensus_slate, insert_different)
 	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
-	tally.insert (now1, 0, 1.0, validators);
+	tally.rise (now1, 0, 1.0, validators);
 	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	tally.insert (now2, 1, 1.0, validators);
+	tally.rise (now2, 1, 1.0, validators);
 	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (2, weight2);
 	ASSERT_EQ (1.0, object2);
-	tally.erase (now1, 0, 1.0);
+	tally.fall (now1, 0, 1.0);
 	auto const & [weight3, object3] = tally.max ();
 	ASSERT_EQ (1, weight3);
 	ASSERT_EQ (1.0, object3);
-	tally.erase (now2, 1, 1.0);
+	tally.fall (now2, 1, 1.0);
 	ASSERT_TRUE (tally.empty ());
 }
 
@@ -239,20 +239,20 @@ TEST (consensus_slate, fault)
 	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
-	tally.insert (now1, 0, 1.0, validators, fault);
+	tally.rise (now1, 0, 1.0, validators, fault);
 	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	tally.insert (now2, 0, 2.0, validators, fault);
+	tally.rise (now2, 0, 2.0, validators, fault);
 	ASSERT_EQ (1, faults.size ());
 	ASSERT_EQ (0, faults[0]);
 	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
-	tally.erase (now1, 0, 1.0);
+	tally.fall (now1, 0, 1.0);
 	auto const & [weight3, object3] = tally.max ();
 	ASSERT_TRUE (tally.empty ());
-	tally.erase (now2, 0, 2.0);
+	tally.fall (now2, 0, 2.0);
 	ASSERT_TRUE (tally.empty ());
 }
 
@@ -262,13 +262,13 @@ TEST (consensus_slate, fault_identical)
 	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = now1 + one;
-	tally.insert (now1, 0, 1.0, validators);
-	tally.insert (now2, 0, 2.0, validators);
-	tally.insert (now2, 0, 1.0, validators);
-	tally.erase (now1, 0, 1.0);
-	tally.erase (now2, 0, 2.0);
+	tally.rise (now1, 0, 1.0, validators);
+	tally.rise (now2, 0, 2.0, validators);
+	tally.rise (now2, 0, 1.0, validators);
+	tally.fall (now1, 0, 1.0);
+	tally.fall (now2, 0, 2.0);
 	ASSERT_FALSE (tally.empty ());
-	tally.erase (now2, 0, 1.0);
+	tally.fall (now2, 0, 1.0);
 	ASSERT_TRUE (tally.empty ());
 }
 
@@ -279,12 +279,12 @@ TEST (consensus_slate, fault_covered)
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
 	auto now3 = incrementing_clock::now ();
-	tally.insert (now1, 0, 1.0, validators);
-	tally.insert (now2, 0, 2.0, validators);
-	tally.erase (now1, 0, 1.0);
-	tally.insert (now3, 0, 2.0, validators);
-	tally.erase (now2, 0, 2.0);
-	tally.erase (now3, 0, 2.0);
+	tally.rise (now1, 0, 1.0, validators);
+	tally.rise (now2, 0, 2.0, validators);
+	tally.fall (now1, 0, 1.0);
+	tally.rise (now3, 0, 2.0, validators);
+	tally.fall (now2, 0, 2.0);
+	tally.fall (now3, 0, 2.0);
 }
 
 TEST (consensus_slate, insert_flip)
@@ -293,17 +293,17 @@ TEST (consensus_slate, insert_flip)
 	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
-	tally.insert (now1, 0, 1.0, validators);
+	tally.rise (now1, 0, 1.0, validators);
 	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	tally.erase (now1, 0, 1.0);
+	tally.fall (now1, 0, 1.0);
 	ASSERT_TRUE (tally.empty ());
-	tally.insert (now2, 0, 2.0, validators);
+	tally.rise (now2, 0, 2.0, validators);
 	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (2.0, object2);
-	tally.erase (now2, 0, 2.0);
+	tally.fall (now2, 0, 2.0);
 	ASSERT_TRUE (tally.empty ());
 }
 
@@ -314,21 +314,21 @@ TEST (consensus_slate, insert_flip_fault)
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
 	auto now3 = incrementing_clock::now ();
-	tally.insert (now1, 0, 1.0, validators);
+	tally.rise (now1, 0, 1.0, validators);
 	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	tally.erase (now1, 0, 1.0);
+	tally.fall (now1, 0, 1.0);
 	ASSERT_TRUE (tally.empty ());
-	tally.insert (now2, 0, 2.0, validators);
+	tally.rise (now2, 0, 2.0, validators);
 	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (2.0, object2);
-	tally.insert (now3, 0, 1.0, validators);
+	tally.rise (now3, 0, 1.0, validators);
 	auto const & [weight3, object3] = tally.max ();
 	ASSERT_EQ (1, weight3);
 	ASSERT_EQ (2.0, object3);
-	tally.erase (now2, 0, 2.0);
+	tally.fall (now2, 0, 2.0);
 	ASSERT_TRUE (tally.empty ());
 }
 

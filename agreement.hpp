@@ -63,29 +63,29 @@ public:
 			total_m = op (total_m, weight);
 		}
 	public:
-		void erase (time_point const & rise, validator const & validator, object const & object)
+		void fall (time_point const & point, validator const & validator, object const & object)
 		{
-			auto & [current, time, weight_l] = votes[validator];
-			if (rise == time && object == current)
+			auto & [current, time_l, weight_l] = votes[validator];
+			if (point == time_l && object == current)
 			{
 				sort (weight_l, object, std::minus<weight> ());
-				time = time_point{};
+				time_l = time_point{};
 			}
 		}
 		template<typename FAULT = decltype(fault_null)>
-		void insert (time_point const & rise, validator const & validator, object const & object, validators const & validators, FAULT const & fault = fault_null)
+		void rise (time_point const & point, validator const & validator, object const & object, validators const & validators, FAULT const & fault = fault_null)
 		{
-			auto & [current, time, weight_l] = votes[validator];
-			if (time == time_point{})
+			auto & [current, time_l, weight_l] = votes[validator];
+			if (time_l == time_point{})
 			{
 				current = object;
-				time = rise;
+				time_l = point;
 				weight_l = validators.weight (validator);
 				sort (weight_l, object, std::plus<weight> ());
 			}
 			else if (current == object)
 			{
-				time = rise;
+				time_l = point;
 			}
 			else
 			{
@@ -187,10 +187,10 @@ public:
 			{
 				auto const & [time, value] = *lower;
 				auto const & [validator, object] = value;
-				tally.erase (time, validator, object);
+				tally.fall (time, validator, object);
 				++lower;
 			}
-			tally.insert (time, validator, object, validators, fault);
+			tally.rise (time, validator, object, validators, fault);
 			++current;
 		}
 	}
