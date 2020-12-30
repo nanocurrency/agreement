@@ -23,6 +23,7 @@ public:
 	using validator = typename validators::key_type;
 	using weight = typename validators::mapped_type;
 	duration const W;
+	static void edge_null (std::unordered_map<object, weight> const &) {};
 private:
 	std::multimap<time_point, std::pair<validator, object>> votes;
 	std::unordered_set<std::shared_ptr<agreement<object, validators, clock, duration>>> parents;
@@ -63,17 +64,19 @@ public:
 			total_m = op (total_m, weight);
 		}
 	public:
-		void fall (time_point const & point, validator const & validator, object const & object)
+		template<typename EDGE = decltype(edge_null)>
+		void fall (time_point const & point, validator const & validator, object const & object, EDGE const & edge = edge_null)
 		{
 			auto & [current, time_l, weight_l] = votes[validator];
 			if (point == time_l && object == current)
 			{
 				sort (weight_l, object, std::minus<weight> ());
 				time_l = time_point{};
+				edge (totals);
 			}
 		}
-		template<typename FAULT = decltype(fault_null)>
-		void rise (time_point const & point, validator const & validator, object const & object, validators const & validators, FAULT const & fault = fault_null)
+		template<typename EDGE = decltype(edge_null), typename FAULT = decltype(fault_null)>
+		void rise (time_point const & point, validator const & validator, object const & object, validators const & validators, EDGE const & edge = edge_null, FAULT const & fault = fault_null)
 		{
 			auto & [current, time_l, weight_l] = votes[validator];
 			if (time_l == time_point{})
@@ -82,6 +85,7 @@ public:
 				time_l = point;
 				weight_l = validators.weight (validator);
 				sort (weight_l, object, std::plus<weight> ());
+				edge (totals);
 			}
 			else if (current == object)
 			{
@@ -173,8 +177,8 @@ public:
 	{
 		parents.insert (parent);
 	}
-	template<typename FAULT>
-	void scan (tally & tally, time_point const & begin, time_point const & end, validators const & validators, FAULT const & fault = fault_null)
+	template<typename EDGE = decltype(edge_null), typename FAULT = decltype(fault_null)>
+	void scan (tally & tally, time_point const & begin, time_point const & end, validators const & validators, EDGE const & edge = edge_null, FAULT const & fault = fault_null)
 	{
 		auto current = votes.lower_bound (begin);
 		auto lower = current;
@@ -187,10 +191,10 @@ public:
 			{
 				auto const & [time, value] = *lower;
 				auto const & [validator, object] = value;
-				tally.fall (time, validator, object);
+				tally.fall (time, validator, object, edge);
 				++lower;
 			}
-			tally.rise (time, validator, object, validators, fault);
+			tally.rise (time, validator, object, validators, edge, fault);
 			++current;
 		}
 	}
@@ -202,7 +206,7 @@ public:
 	void tally (time_point const & begin, time_point const & end, validators const & validators, CONFIRM const & confirm = confirm_null, FAULT const & fault = fault_null)
 	{
 		class tally tally;
-		scan (tally, begin - W + duration{ 1 }, end + W, validators, fault);
+		scan (tally, begin - W + duration{ 1 }, end + W, validators, edge_null, fault);
 		auto const & [weight, object] = tally.max ();
 		if (weight >= validators.quorum ())
 		{
@@ -216,7 +220,7 @@ public:
 	{
 		votes.erase (votes.begin (), votes.upper_bound (now - W));
 		class tally tally;
-		scan (tally, now - W, now, validators, fault);
+		scan (tally, now - W, now, validators, edge_null, fault);
 		auto const & [weight, object] = tally.max ();
 		auto result = now + W;
 		if (tally.total () >= validators.quorum () && last != object)

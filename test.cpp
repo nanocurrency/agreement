@@ -239,11 +239,11 @@ TEST (consensus_slate, fault)
 	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
-	tally.rise (now1, 0, 1.0, validators, fault);
+	tally.rise (now1, 0, 1.0, validators, agreement_u_t::edge_null, fault);
 	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	tally.rise (now2, 0, 2.0, validators, fault);
+	tally.rise (now2, 0, 2.0, validators, agreement_u_t::edge_null, fault);
 	ASSERT_EQ (1, faults.size ());
 	ASSERT_EQ (0, faults[0]);
 	auto const & [weight2, object2] = tally.max ();
