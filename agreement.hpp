@@ -65,10 +65,10 @@ public:
 		}
 	public:
 		template<typename EDGE = decltype(edge_null)>
-		void fall (time_point const & point, validator const & validator, object const & object, EDGE const & edge = edge_null)
+		void fall (time_point const & time, validator const & validator, object const & object, EDGE const & edge = edge_null)
 		{
 			auto & [current, time_l, weight_l] = votes[validator];
-			if (point == time_l && object == current)
+			if (time == time_l && object == current)
 			{
 				sort (weight_l, object, std::minus<weight> ());
 				time_l = time_point{};
@@ -76,20 +76,20 @@ public:
 			}
 		}
 		template<typename EDGE = decltype(edge_null), typename FAULT = decltype(fault_null)>
-		void rise (time_point const & point, validator const & validator, object const & object, validators const & validators, EDGE const & edge = edge_null, FAULT const & fault = fault_null)
+		void rise (time_point const & time, validator const & validator, object const & object, validators const & validators, EDGE const & edge = edge_null, FAULT const & fault = fault_null)
 		{
 			auto & [current, time_l, weight_l] = votes[validator];
 			if (time_l == time_point{})
 			{
 				current = object;
-				time_l = point;
+				time_l = time;
 				weight_l = validators.weight (validator);
 				sort (weight_l, object, std::plus<weight> ());
 				edge (totals);
 			}
 			else if (current == object)
 			{
-				time_l = point;
+				time_l = time;
 			}
 			else
 			{
