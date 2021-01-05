@@ -23,7 +23,7 @@ public:
 	using validator = typename validators::key_type;
 	using weight = typename validators::mapped_type;
 	duration const W;
-	static void edge_null (std::unordered_map<object, weight> const &) {};
+	static void edge_null (time_point const &, std::unordered_map<object, weight> const &) {};
 private:
 	std::multimap<time_point, std::pair<validator, object>> votes;
 	std::unordered_set<std::shared_ptr<agreement<object, validators, clock, duration>>> parents;
@@ -37,7 +37,7 @@ public:
 	class tally
 	{
 		std::multimap<weight, object, std::greater<weight>> rank;
-		std::unordered_map<object, weight> totals;
+		std::unordered_map<object, weight> totals_m;
 		std::unordered_map<validator, std::tuple<object, time_point, weight>> votes;
 
 		using vote = typename decltype(votes)::value_type;
@@ -46,7 +46,7 @@ public:
 		template<typename OP>
 		void sort (weight const & weight, object const & object, OP op)
 		{
-			auto & weight_object = totals[object];
+			auto & weight_object = totals_m[object];
 			auto [current, end] = rank.equal_range (weight_object);
 			while (current != end&& current->second != object)
 			{
@@ -59,24 +59,22 @@ public:
 			}
 			auto weight_new = op (weight_object, weight);
 			rank.insert (std::make_pair (weight_new, object));
-			assert (totals.size () == rank.size ());
+			assert (totals_m.size () == rank.size ());
 			weight_object = weight_new;
 			total_m = op (total_m, weight);
 		}
 	public:
-		template<typename EDGE = decltype(edge_null)>
-		void fall (time_point const & time, validator const & validator, object const & object, EDGE const & edge = edge_null)
+		void fall (time_point const & time, validator const & validator, object const & object)
 		{
 			auto & [current, time_l, weight_l] = votes[validator];
 			if (time == time_l && object == current)
 			{
 				sort (weight_l, object, std::minus<weight> ());
 				time_l = time_point{};
-				edge (totals);
 			}
 		}
-		template<typename EDGE = decltype(edge_null), typename FAULT = decltype(fault_null)>
-		void rise (time_point const & time, validator const & validator, object const & object, validators const & validators, EDGE const & edge = edge_null, FAULT const & fault = fault_null)
+		template<typename FAULT = decltype(fault_null)>
+		void rise (time_point const & time, validator const & validator, object const & object, validators const & validators, FAULT const & fault = fault_null)
 		{
 			auto & [current, time_l, weight_l] = votes[validator];
 			if (time_l == time_point{})
@@ -85,7 +83,6 @@ public:
 				time_l = time;
 				weight_l = validators.weight (validator);
 				sort (weight_l, object, std::plus<weight> ());
-				edge (totals);
 			}
 			else if (current == object)
 			{
@@ -114,10 +111,14 @@ public:
 		{
 			return total_m;
 		}
+		decltype (totals_m) totals () const
+		{
+			return totals_m;
+		}
 		void clear ()
 		{
 			votes.clear ();
-			totals.clear ();
+			totals_m.clear ();
 			rank.clear ();
 			total_m = weight{};
 		}
@@ -191,11 +192,21 @@ public:
 			{
 				auto const & [time, value] = *lower;
 				auto const & [validator, object] = value;
-				tally.fall (time, validator, object, edge);
+				tally.fall (time, validator, object);
 				++lower;
+				edge (time + W, tally.totals ());
 			}
-			tally.rise (time, validator, object, validators, edge, fault);
+			tally.rise (time, validator, object, validators, fault);
 			++current;
+			edge (time, tally.totals ());
+		}
+		while (lower != stop)
+		{
+			auto const & [time, value] = *lower;
+			auto const & [validator, object] = value;
+			tally.fall (time, validator, object);
+			++lower;
+			edge (time + W, tally.totals ());
 		}
 	}
 	void insert (object const & item, time_point const & time, validator const & validator)

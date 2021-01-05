@@ -239,11 +239,11 @@ TEST (consensus_slate, fault)
 	class agreement_u_t::tally tally;
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
-	tally.rise (now1, 0, 1.0, validators, agreement_u_t::edge_null, fault);
+	tally.rise (now1, 0, 1.0, validators, fault);
 	auto const & [weight1, object1] = tally.max ();
 	ASSERT_EQ (1, weight1);
 	ASSERT_EQ (1.0, object1);
-	tally.rise (now2, 0, 2.0, validators, agreement_u_t::edge_null, fault);
+	tally.rise (now2, 0, 2.0, validators, fault);
 	ASSERT_EQ (1, faults.size ());
 	ASSERT_EQ (0, faults[0]);
 	auto const & [weight2, object2] = tally.max ();
@@ -330,6 +330,39 @@ TEST (consensus_slate, insert_flip_fault)
 	ASSERT_EQ (2.0, object3);
 	tally.fall (now2, 0, 2.0);
 	ASSERT_TRUE (tally.empty ());
+}
+
+TEST (consensus_scan, empty)
+{
+	uniform_validators validators{ 3 };
+	agreement_u_t agreement{ W, 0.0 };
+	class agreement_u_t::tally tally;
+	std::deque<std::tuple<incrementing_clock::time_point, std::unordered_map<float, unsigned>>> edges;
+	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, [&edges] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) { edges.push_back (std::make_tuple (time, totals)); });
+	ASSERT_EQ (0, edges.size ());
+}
+
+TEST (consensus_scan, one)
+{
+	uniform_validators validators{ 3 };
+	agreement_u_t agreement{ W, 0.0 };
+	auto now = incrementing_clock::now ();
+	agreement.insert (1.0f, now, 0);
+	class agreement_u_t::tally tally;
+	std::deque<std::tuple<incrementing_clock::time_point, std::unordered_map<float, unsigned>>> edges;
+	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, [&edges] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) { edges.push_back (std::make_tuple (time, totals)); });
+	ASSERT_EQ (2, edges.size ());
+	auto const &[time0, totals0] = edges [0];
+	auto const &[time1, totals1] = edges [1];
+	ASSERT_EQ (now, time0);
+	ASSERT_EQ (1, totals0.size ());
+	auto existing1 = totals0.find (1.0f);
+	ASSERT_NE (totals0.end (), existing1);
+	ASSERT_EQ (1, existing1->second);
+	ASSERT_EQ (now + W, time1);
+	ASSERT_EQ (1, totals1.size ());
+	auto existing2 = totals1.find (1.0f);
+	ASSERT_EQ (0, existing2->second);
 }
 
 TEST (consensus_validator, construction)
