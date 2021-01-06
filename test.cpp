@@ -365,6 +365,99 @@ TEST (consensus_scan, one)
 	ASSERT_EQ (0, existing2->second);
 }
 
+TEST (consensus_scan, two_same)
+{
+	uniform_validators validators{ 3 };
+	agreement_u_t agreement{ W, 0.0 };
+	auto now1 = incrementing_clock::now ();
+	auto now2 = incrementing_clock::now ();
+	agreement.insert (1.0f, now1, 0);
+	agreement.insert (1.0f, now2, 1);
+	class agreement_u_t::tally tally;
+	std::deque<std::tuple<incrementing_clock::time_point, std::unordered_map<float, unsigned>>> edges;
+	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, [&edges] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) { edges.push_back (std::make_tuple (time, totals)); });
+	ASSERT_EQ (4, edges.size ());
+	auto const &[time0, totals0] = edges [0];
+	auto const &[time1, totals1] = edges [1];
+	auto const &[time2, totals2] = edges [2];
+	auto const &[time3, totals3] = edges [3];
+
+	ASSERT_EQ (now1, time0);
+	ASSERT_EQ (1, totals0.size ());
+	auto existing1 = totals0.find (1.0f);
+	ASSERT_NE (totals0.end (), existing1);
+	ASSERT_EQ (1, existing1->second);
+
+	ASSERT_EQ (now2, time1);
+	ASSERT_EQ (1, totals1.size ());
+	auto existing2 = totals1.find (1.0f);
+	ASSERT_NE (totals1.end (), existing2);
+	ASSERT_EQ (2, existing2->second);
+	
+	ASSERT_EQ (now1 + W, time2);
+	ASSERT_EQ (1, totals2.size ());
+	auto existing3 = totals2.find (1.0f);
+	ASSERT_NE (totals2.end (), existing3);
+	ASSERT_EQ (1, existing3->second);
+
+	ASSERT_EQ (now2 + W, time3);
+	ASSERT_EQ (1, totals3.size ());
+	auto existing4 = totals3.find (1.0f);
+	ASSERT_NE (totals3.end (), existing4);
+	ASSERT_EQ (0, existing4->second);
+}
+
+TEST (consensus_scan, two_different)
+{
+	uniform_validators validators{ 3 };
+	agreement_u_t agreement{ W, 0.0 };
+	auto now1 = incrementing_clock::now ();
+	auto now2 = incrementing_clock::now ();
+	agreement.insert (1.0f, now1, 0);
+	agreement.insert (2.0f, now2, 1);
+	class agreement_u_t::tally tally;
+	std::deque<std::tuple<incrementing_clock::time_point, std::unordered_map<float, unsigned>>> edges;
+	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, [&edges] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) { edges.push_back (std::make_tuple (time, totals)); });
+	ASSERT_EQ (4, edges.size ());
+	auto const &[time0, totals0] = edges [0];
+	auto const &[time1, totals1] = edges [1];
+	auto const &[time2, totals2] = edges [2];
+	auto const &[time3, totals3] = edges [3];
+
+	ASSERT_EQ (now1, time0);
+	ASSERT_EQ (1, totals0.size ());
+	auto existing1 = totals0.find (1.0f);
+	ASSERT_NE (totals0.end (), existing1);
+	ASSERT_EQ (1, existing1->second);
+
+	ASSERT_EQ (now2, time1);
+	ASSERT_EQ (2, totals1.size ());
+	auto existing2 = totals1.find (1.0f);
+	ASSERT_NE (totals1.end (), existing2);
+	ASSERT_EQ (1, existing2->second);
+	auto existing3 = totals1.find (2.0f);
+	ASSERT_NE (totals1.end (), existing3);
+	ASSERT_EQ (1, existing3->second);
+	
+	ASSERT_EQ (now1 + W, time2);
+	ASSERT_EQ (2, totals2.size ());
+	auto existing4 = totals2.find (1.0f);
+	ASSERT_NE (totals2.end (), existing4);
+	ASSERT_EQ (0, existing4->second);
+	auto existing5 = totals2.find (2.0f);
+	ASSERT_NE (totals2.end (), existing5);
+	ASSERT_EQ (1, existing5->second);
+	
+	ASSERT_EQ (now2 + W, time2);
+	ASSERT_EQ (2, totals3.size ());
+	auto existing6 = totals3.find (1.0f);
+	ASSERT_NE (totals3.end (), existing6);
+	ASSERT_EQ (0, existing6->second);
+	auto existing7 = totals3.find (2.0f);
+	ASSERT_NE (totals3.end (), existing7);
+	ASSERT_EQ (0, existing7->second);
+}
+
 TEST (consensus_validator, construction)
 {
 	// Test basic consensus object construction
