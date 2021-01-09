@@ -4,6 +4,8 @@
 
 #include <atomic>
 #include <array>
+#include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <random>
 #include <thread>
@@ -89,6 +91,10 @@ public:
 		bool operator== (time_point const & other) const
 		{
 			return value == other.value;
+		}
+		bool operator!= (time_point const & other) const
+		{
+			return !(*this == other);
 		}
 		time_point operator++ (int)
 		{
@@ -457,6 +463,40 @@ TEST (consensus_scan, two_different)
 	ASSERT_NE (totals3.end (), existing7);
 	ASSERT_EQ (0, existing7->second);
 }
+
+TEST (consensus_scan, one_file)
+{
+	std::ofstream edge_file;
+	edge_file.open ("edges.csv", std::ios::out | std::ios::trunc);
+	uniform_validators validators{ 3 };
+	agreement_u_t agreement{ W, 0.0 };
+	auto now1 = incrementing_clock::now ();
+	auto now2 = incrementing_clock::now ();
+	auto now3 = incrementing_clock::now ();
+	std::cerr << now1.value << ' ' << now2.value << ' ' << now3.value << '\n';
+	agreement.insert (1.0f, now1, 0);
+	agreement.insert (2.0f, now2, 1);
+	agreement.insert (2.0f, now3, 2);
+	class agreement_u_t::tally tally;
+	incrementing_clock::time_point last_time;
+	std::unordered_map<float, unsigned> last_totals;
+	auto output = [&edge_file] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) {
+		for (auto const & i: totals)
+		{
+			edge_file << std::to_string (time.value) << ',' << std::to_string (i.first) << ',' << std::to_string (i.second) << '\n';
+		}
+	};
+	auto edges = [&output, &last_time, &last_totals] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) {
+		if (last_time != time)
+		{
+			output (last_time, last_totals);
+		}
+		last_time = time;
+		last_totals = totals;
+	};
+	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, edges);
+	output (last_time, last_totals);
+ }
 
 TEST (consensus_validator, construction)
 {
