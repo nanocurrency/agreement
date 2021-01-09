@@ -25,10 +25,9 @@ fig, ax = plt.subplots()
 
 bottom = None
 width = 0.35
-for val in value_samples:
-    items = value_samples[val]
-    ax.bar (labels, items, width, bottom=bottom, label=val)
-    bottom = items
+
+ax.stackplot(labels, value_samples.values(),
+             labels=value_samples.keys())
 
 ax.set_ylabel ('Weight')
 ax.set_title ('Value weight at time')
