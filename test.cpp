@@ -129,7 +129,7 @@ public:
 	static time_point now ()
 	{
 		auto result = current;
-		if (dist (e1) != 0)
+		//if (dist (e1) != 0)
 		{
 			current++;
 		}
@@ -138,6 +138,21 @@ public:
 };
 using agreement_t = nano::agreement<float, fixed_validators, incrementing_clock>;
 using agreement_u_t = nano::agreement<float, uniform_validators, incrementing_clock>;
+
+template<typename T>
+void filedump (T & agreement, typename T::validators const & validators, std::filesystem::path const & path)
+{
+	class T::tally tally;
+	std::ofstream edge_file;
+	edge_file.open (path, std::ios::out | std::ios::trunc);
+	auto edges = [&edge_file] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) {
+		for (auto const & i: totals)
+		{
+			edge_file << std::to_string (time.value) << ',' << std::to_string (i.first) << ',' << std::to_string (i.second) << '\n';
+		}
+	};
+	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, edges);
+}
 
 TEST (consensus_validator, non_convertable)
 {
@@ -423,7 +438,9 @@ TEST (consensus_scan, two_different)
 	agreement.insert (2.0f, now2, 1);
 	class agreement_u_t::tally tally;
 	std::deque<std::tuple<incrementing_clock::time_point, std::unordered_map<float, unsigned>>> edges;
-	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, [&edges] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) { edges.push_back (std::make_tuple (time, totals)); });
+	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, [&edges] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) {
+		edges.push_back (std::make_tuple (time, totals));
+	});
 	ASSERT_EQ (4, edges.size ());
 	auto const &[time0, totals0] = edges [0];
 	auto const &[time1, totals1] = edges [1];
@@ -454,7 +471,7 @@ TEST (consensus_scan, two_different)
 	ASSERT_NE (totals2.end (), existing5);
 	ASSERT_EQ (1, existing5->second);
 	
-	ASSERT_EQ (now2 + W, time2);
+	ASSERT_EQ (now2 + W, time3);
 	ASSERT_EQ (2, totals3.size ());
 	auto existing6 = totals3.find (1.0f);
 	ASSERT_NE (totals3.end (), existing6);
@@ -466,36 +483,15 @@ TEST (consensus_scan, two_different)
 
 TEST (consensus_scan, one_file)
 {
-	std::ofstream edge_file;
-	edge_file.open ("edges.csv", std::ios::out | std::ios::trunc);
 	uniform_validators validators{ 3 };
 	agreement_u_t agreement{ W, 0.0 };
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
 	auto now3 = incrementing_clock::now ();
-	std::cerr << now1.value << ' ' << now2.value << ' ' << now3.value << '\n';
 	agreement.insert (1.0f, now1, 0);
 	agreement.insert (2.0f, now2, 1);
 	agreement.insert (2.0f, now3, 2);
-	class agreement_u_t::tally tally;
-	incrementing_clock::time_point last_time;
-	std::unordered_map<float, unsigned> last_totals;
-	auto output = [&edge_file] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) {
-		for (auto const & i: totals)
-		{
-			edge_file << std::to_string (time.value) << ',' << std::to_string (i.first) << ',' << std::to_string (i.second) << '\n';
-		}
-	};
-	auto edges = [&output, &last_time, &last_totals] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) {
-		if (last_time != time)
-		{
-			output (last_time, last_totals);
-		}
-		last_time = time;
-		last_totals = totals;
-	};
-	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, edges);
-	output (last_time, last_totals);
+	filedump (agreement, validators, "edges.csv");
  }
 
 TEST (consensus_validator, construction)
@@ -584,7 +580,7 @@ TEST (consensus_validator, tally_multi_fault)
 	consensus.tally (now + W, now + W, validators, confirm, fault);
 	ASSERT_EQ (1, faults.size ());
 	consensus.insert (3.0, now + one, 0);
-	consensus.tally (now + one, now + one, validators, confirm, fault);
+	consensus.tally (now, now + one, validators, confirm, fault);
 	ASSERT_FALSE (agreement.has_value ());
 	ASSERT_EQ (3, faults.size ());
 }
@@ -599,7 +595,7 @@ TEST (consensus_validator, tally_1_succeed)
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
-	consensus.tally (now, now, validators, confirm);
+	consensus.tally (now, now + one, validators, confirm);
 	ASSERT_TRUE (agreement.has_value ());
 	ASSERT_EQ (0.0, agreement.value ());
 }
@@ -672,7 +668,7 @@ TEST (consensus_validator, tally_2_time_succeed)
 	ASSERT_FALSE (agreement.has_value ());
 	// Maximum slate size is W, this vote and the previous need to fit in a single slate
 	consensus.insert (0.0, now + W - one, 1);
-	consensus.tally (now + W - one, now + W - one, validators, confirm);
+	consensus.tally (now, now + W, validators, confirm);
 	ASSERT_TRUE (agreement.has_value ());
 	ASSERT_EQ (0.0, agreement.value ());
 }
@@ -690,7 +686,7 @@ TEST (consensus_validator, tally_2_time_succeed_reverse)
 	consensus.tally (now + W - one, now + W - one, validators, confirm);
 	ASSERT_FALSE (agreement.has_value ());
 	consensus.insert (0.0, now, 1);
-	consensus.tally (now, now, validators, confirm);
+	consensus.tally (now, now + W, validators, confirm);
 	ASSERT_TRUE (agreement.has_value ());
 	ASSERT_EQ (0.0, agreement.value ());
 }

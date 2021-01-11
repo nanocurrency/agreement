@@ -200,7 +200,7 @@ public:
 			++current;
 			edge (time, tally.totals ());
 		}
-		while (lower != stop)
+		while (lower != stop && lower->first + W < end)
 		{
 			auto const & [time, value] = *lower;
 			auto const & [validator, object] = value;
@@ -217,7 +217,7 @@ public:
 	void tally (time_point const & begin, time_point const & end, validators const & validators, CONFIRM const & confirm = confirm_null, FAULT const & fault = fault_null)
 	{
 		class tally tally;
-		scan (tally, begin - W + duration{ 1 }, end + W, validators, edge_null, fault);
+		scan (tally, begin, end, validators, edge_null, fault);
 		auto const & [weight, object] = tally.max ();
 		if (weight >= validators.quorum ())
 		{
