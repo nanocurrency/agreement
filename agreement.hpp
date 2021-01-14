@@ -223,7 +223,6 @@ public:
 		{
 			confirm (object);
 			parents.clear ();
-			votes.clear ();
 		}
 	}
 	template<typename VoteFunction, typename FAULT = decltype(fault_null)>
