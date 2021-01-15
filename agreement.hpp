@@ -214,16 +214,28 @@ public:
 		votes.emplace (std::make_pair (time, std::make_pair (validator, item)));
 	}
 	template<typename CONFIRM = decltype(confirm_null), typename FAULT = decltype(fault_null)>
-	void tally (time_point const & begin, time_point const & end, validators const & validators, CONFIRM const & confirm = confirm_null, FAULT const & fault = fault_null)
+	void tally (time_point const & begin, time_point const & end, validators const & validators, CONFIRM const & confirm = confirm_null, FAULT const & fault = fault_null, duration const & hold = duration{})
 	{
 		class tally tally;
-		scan (tally, begin, end, validators, edge_null, fault);
-		auto const & [weight, object] = tally.max ();
-		if (weight >= validators.quorum ())
-		{
-			confirm (object);
-			parents.clear ();
-		}
+		bool holding = false;
+		time_point set;
+		object obj = last;
+		auto hold_sampler = [this, &obj, &hold, &holding, &set, &tally, &validators, &confirm] (time_point const & time, std::unordered_map<object, weight> const & totals) {
+			auto const & [weight, object] = tally.max ();
+			if (obj != object)
+			{
+				holding = false;
+				set = time;
+				obj = object;
+			}
+			holding = weight >= validators.quorum ();
+			if (holding && time - set >= hold && obj == object)
+			{
+				confirm (object);
+				parents.clear ();
+			}
+		};
+		scan (tally, begin, end, validators, hold_sampler, fault);
 	}
 	template<typename VoteFunction, typename FAULT = decltype(fault_null)>
 	time_point vote (VoteFunction const & vote, validators const & validators, time_point const & now = clock::now (), FAULT const & fault = fault_null)

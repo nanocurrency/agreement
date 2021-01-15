@@ -109,6 +109,10 @@ public:
 		{
 			return time_point{ value - item.count () };
 		}
+		std::chrono::milliseconds operator- (time_point const & other) const
+		{
+			return std::chrono::milliseconds{ value - other.value };
+		}
 		static time_point max ()
 		{
 			return time_point{ std::numeric_limits<uint64_t>::max () };
@@ -483,14 +487,16 @@ TEST (consensus_scan, two_different)
 
 TEST (consensus_scan, one_file)
 {
-	uniform_validators validators{ 3 };
+	uniform_validators validators{ 5 };
 	agreement_u_t agreement{ W, 0.0 };
 	auto now1 = incrementing_clock::now ();
 	auto now2 = incrementing_clock::now ();
 	auto now3 = incrementing_clock::now ();
 	agreement.insert (1.0f, now1, 0);
 	agreement.insert (2.0f, now2, 1);
-	agreement.insert (2.0f, now3, 2);
+	agreement.insert (3.0f, now2, 2);
+	agreement.insert (2.0f, now3, 3);
+	agreement.insert (3.0f, now3, 4);
 	filedump (agreement, validators, "edges.csv");
  }
 
