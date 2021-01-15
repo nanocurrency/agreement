@@ -1180,7 +1180,7 @@ TEST (consensus, fuzz)
 			std::lock_guard<std::mutex> lock (mutex);
 			auto message = shared.get ();
 			item->insert (message.obj, message.time, message.validator);
-			item->tally (message.time, message.time, validators, [this] (bool const & value) { agreement = value; });
+			item->tally (message.time - W + std::chrono::milliseconds{ 1 }, message.time + W, validators, [this] (bool const & value) { agreement = value; });
 			if (!set && agreement.has_value ())
 			{
 				shared.confirm (agreement.value ());
