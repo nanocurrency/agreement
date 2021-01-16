@@ -48,7 +48,8 @@ for file in files:
 	bottom = None
 	width = 0.35
 
-	ax.stackplot(labels, value_samples.values(), labels=value_samples.keys())
+	for value in value_samples:
+		ax.plot (labels, value_samples[value], label=value)
 
 	ax.set_ylabel ('Weight')
 	ax.set_title ('Value weight at time')
