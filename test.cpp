@@ -149,13 +149,13 @@ void filedump (T & agreement, typename T::validators const & validators, std::fi
 	class T::tally tally;
 	std::ofstream edge_file;
 	edge_file.open (path, std::ios::out | std::ios::trunc);
-	auto edges = [&edge_file] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) {
+	auto edges = [&edge_file] (typename T::time_point const & time, std::unordered_map<typename T::object, typename T::weight> const & totals) {
 		for (auto const & i: totals)
 		{
-			edge_file << std::to_string (time.value) << ',' << std::to_string (i.first) << ',' << std::to_string (i.second) << '\n';
+			edge_file << std::to_string (time.time_since_epoch ().count ()) << ',' << std::to_string (i.first) << ',' << std::to_string (i.second) << '\n';
 		}
 	};
-	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, edges);
+	agreement.scan (tally, typename T::time_point{}, T::time_point::max (), validators, edges);
 }
 
 TEST (consensus_validator, non_convertable)
@@ -390,7 +390,7 @@ TEST (consensus_scan, one)
 	ASSERT_EQ (0, existing2->second);
 }
 
-TEST (consensus_scan, two_same)
+TEST (consensus_scan, two_same_value)
 {
 	uniform_validators validators{ 3 };
 	agreement_u_t agreement{ W, 0.0 };
@@ -432,7 +432,7 @@ TEST (consensus_scan, two_same)
 	ASSERT_EQ (0, existing4->second);
 }
 
-TEST (consensus_scan, two_different)
+TEST (consensus_scan, two_different_value)
 {
 	uniform_validators validators{ 3 };
 	agreement_u_t agreement{ W, 0.0 };
@@ -483,6 +483,33 @@ TEST (consensus_scan, two_different)
 	auto existing7 = totals3.find (2.0f);
 	ASSERT_NE (totals3.end (), existing7);
 	ASSERT_EQ (0, existing7->second);
+}
+
+TEST (consensus_scan, two_same_time)
+{
+	uniform_validators validators{ 3 };
+	agreement_u_t agreement{ W, 0.0 };
+	auto now1 = incrementing_clock::now ();
+	agreement.insert (1.0f, now1, 0);
+	agreement.insert (1.0f, now1, 1);
+	class agreement_u_t::tally tally;
+	std::deque<std::tuple<incrementing_clock::time_point, std::unordered_map<float, unsigned>>> edges;
+	agreement.scan (tally, incrementing_clock::time_point{}, incrementing_clock::time_point::max (), validators, [&edges] (incrementing_clock::time_point const & time, std::unordered_map<float, unsigned> const & totals) { edges.push_back (std::make_tuple (time, totals)); });
+	ASSERT_EQ (2, edges.size ());
+	auto const &[time0, totals0] = edges [0];
+	auto const &[time1, totals1] = edges [1];
+	
+	ASSERT_EQ (now1, time0);
+	ASSERT_EQ (1, totals0.size ());
+	auto existing0 = totals0.find (1.0f);
+	ASSERT_NE (totals0.end (), existing0);
+	ASSERT_EQ (2, existing0->second);
+	
+	ASSERT_EQ (now1 + W, time1);
+	ASSERT_EQ (1, totals1.size ());
+	auto existing2 = totals1.find (1.0f);
+	ASSERT_NE (totals1.end (), existing2);
+	ASSERT_EQ (0, existing2->second);
 }
 
 TEST (consensus_scan, one_file)
@@ -1209,6 +1236,7 @@ TEST (consensus, fuzz)
 				}
 				output += '\n';
 				std::cerr << output;
+				filedump (*item, validators, std::string ("edges_") + std::to_string (self) + ".csv");
 			}
 		}
 		std::mutex mutex;

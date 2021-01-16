@@ -194,11 +194,17 @@ public:
 				auto const & [validator, object] = value;
 				tally.fall (time, validator, object);
 				++lower;
-				edge (time + W, tally.totals ());
+				if (lower == stop || lower->first != time)
+				{
+					edge (time + W, tally.totals ());
+				}
 			}
 			tally.rise (time, validator, object, validators, fault);
 			++current;
-			edge (time, tally.totals ());
+			if (current == stop || current->first != time)
+			{
+				edge (time, tally.totals ());
+			}
 		}
 		while (lower != stop && lower->first + W < end)
 		{
@@ -206,7 +212,10 @@ public:
 			auto const & [validator, object] = value;
 			tally.fall (time, validator, object);
 			++lower;
-			edge (time + W, tally.totals ());
+			if (lower == stop || lower->first != time)
+			{
+				edge (time + W, tally.totals ());
+			}
 		}
 	}
 	void insert (object const & item, time_point const & time, validator const & validator)
