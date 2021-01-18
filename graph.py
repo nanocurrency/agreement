@@ -20,6 +20,7 @@ for file in files:
 	print (file)
 	labels = []
 	value_samples = {}
+	quorum = []
 
 	with open (file, 'r') as file:
 		points = csv.reader (file)
@@ -31,6 +32,7 @@ for file in files:
 				last_time = time
 				samples = samples + 1
 				labels.append (time)
+				quorum.append (10)
 			if value not in value_samples.keys ():
 				print (value)
 				new_samples = []
@@ -48,6 +50,8 @@ for file in files:
 	bottom = None
 	width = 0.35
 
+	fig.suptitle (file)
+	ax.plot (labels, quorum, label='quorum')
 	for value in value_samples:
 		ax.plot (labels, value_samples[value], label=value)
 

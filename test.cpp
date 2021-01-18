@@ -113,6 +113,10 @@ public:
 		{
 			return std::chrono::milliseconds{ value - other.value };
 		}
+		static time_point min ()
+		{
+			return time_point{};
+		}
 		static time_point max ()
 		{
 			return time_point{ std::numeric_limits<uint64_t>::max () };
@@ -142,6 +146,8 @@ public:
 };
 using agreement_t = nano::agreement<float, fixed_validators, incrementing_clock>;
 using agreement_u_t = nano::agreement<float, uniform_validators, incrementing_clock>;
+static incrementing_clock::time_point min = incrementing_clock::time_point::min ();
+static incrementing_clock::time_point max = incrementing_clock::time_point::max ();
 
 template<typename T>
 void filedump (T & agreement, typename T::validators const & validators, std::filesystem::path const & path)
@@ -541,7 +547,7 @@ TEST (consensus_validator, tally_1_fail)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	agreement_u_t consensus{ W, 0.0 };
 	consensus.insert (0.0, now, 0);
 	consensus.tally (now, now, validators, confirm, fault);
@@ -558,7 +564,7 @@ TEST (consensus_validator, tally_double_fail)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	agreement_u_t consensus{ W, 0.0 };
 	consensus.insert (0.0, now, 0);
 	consensus.tally (now, now, validators, confirm, fault);
@@ -578,7 +584,7 @@ TEST (consensus_validator, tally_2_fault)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
@@ -599,7 +605,7 @@ TEST (consensus_validator, tally_multi_fault)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
@@ -624,11 +630,11 @@ TEST (consensus_validator, tally_1_succeed)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 1 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
-	consensus.tally (now, now + one, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	ASSERT_TRUE (agreement.has_value ());
 	ASSERT_EQ (0.0, agreement.value ());
 }
@@ -640,7 +646,7 @@ TEST (consensus_validator, tally_2_fail)
 	// Two votes is insufficient quorum for 4 validators
 	uniform_validators validators{ 4 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
@@ -657,7 +663,7 @@ TEST (consensus_validator, tally_2_different_fail)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
@@ -675,14 +681,14 @@ TEST (consensus_validator, tally_2_succeed)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
-	consensus.tally (now, now, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	ASSERT_FALSE (agreement.has_value ());
 	consensus.insert (0.0, now, 1);
-	consensus.tally (now, now, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	ASSERT_TRUE (agreement.has_value ());
 	ASSERT_EQ (0.0, agreement.value ());
 }
@@ -693,15 +699,15 @@ TEST (consensus_validator, tally_2_time_succeed)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
-	consensus.tally (now, now, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	ASSERT_FALSE (agreement.has_value ());
 	// Maximum slate size is W, this vote and the previous need to fit in a single slate
 	consensus.insert (0.0, now + W - one, 1);
-	consensus.tally (now, now + W, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	ASSERT_TRUE (agreement.has_value ());
 	ASSERT_EQ (0.0, agreement.value ());
 }
@@ -712,14 +718,14 @@ TEST (consensus_validator, tally_2_time_succeed_reverse)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now + W - one, 0);
-	consensus.tally (now + W - one, now + W - one, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	ASSERT_FALSE (agreement.has_value ());
 	consensus.insert (0.0, now, 1);
-	consensus.tally (now, now + W, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	ASSERT_TRUE (agreement.has_value ());
 	ASSERT_EQ (0.0, agreement.value ());
 }
@@ -730,7 +736,7 @@ TEST (consensus_validator, tally_2_time_fail)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
@@ -748,16 +754,16 @@ TEST (consensus_validator, tally_3_succeed)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
-	consensus.tally (now, now, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	ASSERT_FALSE (agreement.has_value ());
 	consensus.insert (1.0, now, 1);
-	consensus.tally (now, now, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	consensus.insert (1.0, now, 2);
-	consensus.tally (now, now, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	ASSERT_TRUE (agreement.has_value ());
 	ASSERT_EQ (1.0, agreement.value ());
 }
@@ -768,7 +774,7 @@ TEST (consensus_validator, tally_3_fail)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 3 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	consensus.insert (0.0, now, 0);
@@ -782,19 +788,67 @@ TEST (consensus_validator, tally_3_fail)
 	ASSERT_FALSE (agreement.has_value ());
 }
 
+TEST (consensus_validator, hold_min)
+{
+	auto now = incrementing_clock::now ();
+	uniform_validators validators{ 3 };
+	std::optional<agreement_u_t::object> agreement;
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
+	auto root = std::make_shared<agreement_u_t> (W, 0.0);
+	agreement_u_t consensus{ W, 0.0, root };
+	consensus.insert (1.0, now, 0);
+	consensus.insert (1.0, now + W, 1);
+	consensus.tally (incrementing_clock::time_point::min (), incrementing_clock::time_point::max (), validators, confirm);
+	ASSERT_FALSE (agreement.has_value ());
+	consensus.insert (1.0, now + W - one, 2);
+	consensus.tally (incrementing_clock::time_point::min (), incrementing_clock::time_point::max (), validators, confirm);
+	ASSERT_TRUE (agreement.has_value ());
+	ASSERT_EQ (1.0, agreement.value ());
+}
+
+TEST (consensus_validator, hold_two_fail)
+{
+	auto now = incrementing_clock::now ();
+	uniform_validators validators{ 3 };
+	std::optional<agreement_u_t::object> agreement;
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
+	auto root = std::make_shared<agreement_u_t> (W, 0.0);
+	agreement_u_t consensus{ W, 0.0, root };
+	consensus.insert (1.0, now, 0);
+	consensus.insert (1.0, now + W - one, 1);
+	consensus.tally (incrementing_clock::time_point::min (), incrementing_clock::time_point::max (), validators, confirm, agreement_u_t::fault_null, std::chrono::milliseconds{ 2 });
+	ASSERT_FALSE (agreement.has_value ());
+}
+
+
+TEST (consensus_validator, hold_two_succeed)
+{
+	auto now = incrementing_clock::now ();
+	uniform_validators validators{ 3 };
+	std::optional<agreement_u_t::object> agreement;
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
+	auto root = std::make_shared<agreement_u_t> (W, 0.0);
+	agreement_u_t consensus{ W, 0.0, root };
+	consensus.insert (1.0, now, 0);
+	consensus.insert (1.0, now + W - one - one, 1);
+	consensus.tally (incrementing_clock::time_point::min (), incrementing_clock::time_point::max (), validators, confirm, agreement_u_t::fault_null, std::chrono::milliseconds{ 2 });
+	ASSERT_TRUE (agreement.has_value ());
+	ASSERT_EQ (1.0, agreement.value ());
+}
+
 TEST (consensus_validator, tally_many_succeed)
 {
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 1000 };
 	std::optional<agreement_u_t::object> agreement;
-	auto confirm = [&agreement] (agreement_u_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_u_t::object const & value, unsigned const &) { agreement = value; };
 	auto root = std::make_shared<agreement_u_t> (W, 0.0);
 	agreement_u_t consensus{ W, 0.0, root };
 	for (auto i = 0; i < 1000; ++i)
 	{
 		consensus.insert (i < 667 ? 1.0 : 2.0, now, i);
 	}
-	consensus.tally (now, now, validators, confirm);
+	consensus.tally (min, max, validators, confirm);
 	ASSERT_TRUE (agreement.has_value ());
 	ASSERT_EQ (1.0, agreement.value ());
 }
@@ -1049,7 +1103,7 @@ TEST (consensus_perf, validate_duplicates)
 	auto now = incrementing_clock::now ();
 	fixed_validators validators{};
 	std::optional<agreement_t::object> agreement;
-	auto confirm = [&agreement] (agreement_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_t::object const & value, unsigned const &) { agreement = value; };
 	agreement_t validator{ W, 0.0 };
 	for (auto i = 0; i < regression_count; ++i)
 	{
@@ -1066,7 +1120,7 @@ TEST (consensus_perf, validate_10)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 10 };
 	std::optional<agreement_binary_t::object> agreement;
-	auto confirm = [&agreement] (agreement_binary_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_binary_t::object const & value, unsigned const &) { agreement = value; };
 	agreement_binary_t validator{ W, 0 };
 	for (auto i = 0; i < regression_count; ++i)
 	{
@@ -1083,7 +1137,7 @@ TEST (consensus_perf, validate_100)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 100 };
 	std::optional<agreement_binary_t::object> agreement;
-	auto confirm = [&agreement] (agreement_binary_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_binary_t::object const & value, unsigned const &) { agreement = value; };
 	agreement_binary_t validator{ W, 0 };
 	for (auto i = 0; i < regression_count; ++i)
 	{
@@ -1100,7 +1154,7 @@ TEST (consensus_perf, DISABLED_validate_1000)
 	auto now = incrementing_clock::now ();
 	uniform_validators validators{ 1000 };
 	std::optional<agreement_binary_t::object> agreement;
-	auto confirm = [&agreement] (agreement_binary_t::object const & value) { agreement = value; };
+	auto confirm = [&agreement] (agreement_binary_t::object const & value, unsigned const &) { agreement = value; };
 	agreement_binary_t validator{ W, 0 };
 	for (auto i = 0; i < regression_count; ++i)
 	{
@@ -1117,7 +1171,8 @@ using agreement_short_sys_t = nano::agreement<uint16_t, uniform_validators>;
 TEST (consensus, fuzz)
 {
 	std::chrono::milliseconds W{ 200 };
-	uniform_validators validators{ 30 };
+	uniform_validators validators{ 15 };
+	std::cerr << "Quorum: " << validators.quorum () << std::endl;
 	class shared
 	{
 	public:
@@ -1204,12 +1259,17 @@ TEST (consensus, fuzz)
 		}
 		void action ()
 		{
+			unsigned weight_l;
 			std::lock_guard<std::mutex> lock (mutex);
 			auto message = shared.get ();
 			item->insert (message.obj, message.time, message.validator);
-			item->tally (message.time - W + std::chrono::milliseconds{ 1 }, message.time + W, validators, [this] (bool const & value) { agreement = value; });
+			item->tally (message.time - W + std::chrono::milliseconds{ 1 }, message.time + W, validators, [this, &weight_l] (bool const & value, unsigned const & weight) {
+				weight_l = weight;
+				agreement = value;
+			});
 			if (!set && agreement.has_value ())
 			{
+				std::cerr << self << ' ' << weight_l << ' ' << agreement.value () << std::endl;
 				shared.confirm (agreement.value ());
 				//dump ();
 				set = true;

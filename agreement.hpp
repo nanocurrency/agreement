@@ -24,6 +24,8 @@ public:
 	using weight = typename validators::mapped_type;
 	duration const W;
 	static void edge_null (time_point const &, std::unordered_map<object, weight> const &) {};
+	static void fault_null (validator const &) {};
+	static void confirm_null (object const &, weight const &) {};
 private:
 	std::multimap<time_point, std::pair<validator, object>> votes;
 	std::unordered_set<std::shared_ptr<agreement<object, validators, clock, duration>>> parents;
@@ -31,8 +33,6 @@ private:
 	object last;
 	
 	using child = typename decltype(parents)::value_type;
-	static void fault_null (validator const &) {};
-	static void confirm_null (object const &) {};
 public:
 	class tally
 	{
@@ -231,18 +231,18 @@ public:
 		object obj = last;
 		auto hold_sampler = [this, &obj, &hold, &holding, &set, &tally, &validators, &confirm] (time_point const & time, std::unordered_map<object, weight> const & totals) {
 			auto const & [weight, object] = tally.max ();
-			if (obj != object)
+			auto holding_new = weight >= validators.quorum ();
+			if (holding && time - set >= hold)
 			{
-				holding = false;
+				confirm (obj, weight);
+				parents.clear ();
+			}
+			if (!holding || obj != object)
+			{
 				set = time;
 				obj = object;
 			}
-			holding = weight >= validators.quorum ();
-			if (holding && time - set >= hold && obj == object)
-			{
-				confirm (object);
-				parents.clear ();
-			}
+			holding = holding_new;
 		};
 		scan (tally, begin, end, validators, hold_sampler, fault);
 	}
