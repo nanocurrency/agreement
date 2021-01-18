@@ -1168,11 +1168,11 @@ TEST (consensus_perf, DISABLED_validate_1000)
 
 using agreement_short_sys_t = nano::agreement<uint16_t, uniform_validators>;
 
-TEST (consensus, fuzz)
+bool fuzz_body ()
 {
 	std::chrono::milliseconds W{ 200 };
 	uniform_validators validators{ 15 };
-	std::cerr << "Quorum: " << validators.quorum () << std::endl;
+	//std::cerr << "Quorum: " << validators.quorum () << std::endl;
 	class shared
 	{
 	public:
@@ -1266,10 +1266,10 @@ TEST (consensus, fuzz)
 			item->tally (message.time - W + std::chrono::milliseconds{ 1 }, message.time + W, validators, [this, &weight_l] (bool const & value, unsigned const & weight) {
 				weight_l = weight;
 				agreement = value;
-			});
+			}, agreement_short_sys_t::fault_null, std::chrono::milliseconds{ 50 });
 			if (!set && agreement.has_value ())
 			{
-				std::cerr << self << ' ' << weight_l << ' ' << agreement.value () << std::endl;
+				//std::cerr << self << ' ' << weight_l << ' ' << agreement.value () << std::endl;
 				shared.confirm (agreement.value ());
 				//dump ();
 				set = true;
@@ -1281,13 +1281,12 @@ TEST (consensus, fuzz)
 				last = now;
 				vote ();
 			}
-			//item->dump ();
 		}
 		void dump ()
 		{
 			if (!faulty ())
 			{
-				std::string output = "V(" + std::to_string (self) + "):\t";
+				/*std::string output = "V(" + std::to_string (self) + "):\t";
 				record (agreement.value ());
 				for (auto i = history.rbegin (), n = history.rend (); i != n; ++i)
 				{
@@ -1295,7 +1294,7 @@ TEST (consensus, fuzz)
 					output += ' ';
 				}
 				output += '\n';
-				std::cerr << output;
+				std::cerr << output;*/
 				filedump (*item, validators, std::string ("edges_") + std::to_string (self) + ".csv");
 			}
 		}
@@ -1336,8 +1335,29 @@ TEST (consensus, fuzz)
 	std::for_each (threads.begin (), threads.end (), [] (std::thread & thread) {
 		thread.join ();
 	});
-	std::for_each (agreements.begin (), agreements.end (), [] (consensus & item) {
-		item.dump ();
-	});
-	ASSERT_EQ (1, shared.confirmed.size ());
+	auto error = shared.confirmed.size () != 1;
+	if (error)
+	{
+		std::for_each (agreements.begin (), agreements.end (), [] (consensus & item) {
+			item.dump ();
+		});
+	}
+	return error;
+}
+
+TEST (consensus, fuzz)
+{
+	int success = 0, failure = 0;
+	for (auto i = 0; i < 2000; ++i)
+	{
+		if (fuzz_body())
+		{
+			++failure;
+		}
+		else
+		{
+			++success;
+		}
+		std::cerr << success << ' ' << failure << std::endl;
+	}
 }
