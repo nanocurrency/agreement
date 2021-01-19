@@ -66,7 +66,7 @@ public:
 	}
 	unsigned quorum () const
 	{
-		return std::ceil (count * 2.0 / 3.0);
+		return count - ((count - 1) / 3);
 	}
 	size_t size () const
 	{
@@ -1348,7 +1348,8 @@ bool fuzz_body ()
 TEST (consensus, fuzz)
 {
 	int success = 0, failure = 0;
-	for (auto i = 0; i < 2000; ++i)
+	//for (auto i = 0; i < 2000; ++i)
+	while (true)
 	{
 		if (fuzz_body())
 		{
