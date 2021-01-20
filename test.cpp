@@ -1170,8 +1170,8 @@ using agreement_short_sys_t = nano::agreement<uint16_t, uniform_validators>;
 
 bool fuzz_body ()
 {
-	std::chrono::milliseconds W{ 200 };
-	uniform_validators validators{ 15 };
+	std::chrono::milliseconds W{ 50 };
+	uniform_validators validators{ 4 };
 	//std::cerr << "Quorum: " << validators.quorum () << std::endl;
 	class shared
 	{
@@ -1266,7 +1266,7 @@ bool fuzz_body ()
 			item->tally (message.time - W + std::chrono::milliseconds{ 1 }, message.time + W, validators, [this, &weight_l] (bool const & value, unsigned const & weight) {
 				weight_l = weight;
 				agreement = value;
-			}, agreement_short_sys_t::fault_null, std::chrono::milliseconds{ 50 });
+			}, agreement_short_sys_t::fault_null, std::chrono::milliseconds{ 51 });
 			if (!set && agreement.has_value ())
 			{
 				//std::cerr << self << ' ' << weight_l << ' ' << agreement.value () << std::endl;
