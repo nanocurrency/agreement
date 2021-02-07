@@ -34,6 +34,7 @@ private:
 	
 	using child = typename decltype(parents)::value_type;
 public:
+	// Transforms a sequence of rising and falling edges to an ordered weighted sum map
 	class tally
 	{
 		std::multimap<weight, object, std::greater<weight>> rank;
