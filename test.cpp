@@ -1201,6 +1201,7 @@ public:
 		this->shared.put (obj, time, this->self);
 	} }
 	{
+		reset ();
 	}
 	bool faulty () const
 	{
@@ -1246,6 +1247,7 @@ public:
 	{
 		std::lock_guard<std::mutex> lock{ mutex };
 		agreement.reset ();
+		vote ();
 	}
 	std::mutex mutex;
 	std::chrono::milliseconds const W;
@@ -1269,7 +1271,6 @@ bool fuzz_body ()
 	for (decltype(validators)::key_type i = 0; i < validators.size (); ++i)
 	{
 		agreements.emplace_back (W, validators, shared, i);
-		agreements.back ().vote ();
 	}
 	for (auto i = 0; i < std::thread::hardware_concurrency(); ++i)
 	{
