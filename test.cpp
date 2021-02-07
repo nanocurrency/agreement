@@ -146,18 +146,18 @@ static incrementing_clock::time_point min = incrementing_clock::time_point::min 
 static incrementing_clock::time_point max = incrementing_clock::time_point::max ();
 
 template<typename T>
-void filedump (T & agreement, typename T::validators const & validators, std::filesystem::path const & path)
+void filedump (T & agreement, typename T::validators const & validators, std::filesystem::path const & path, typename T::time_point begin = typename T::time_point{}, typename T::time_point end = T::time_point::max ())
 {
 	class T::tally tally;
 	std::ofstream edge_file;
 	edge_file.open (path, std::ios::out | std::ios::trunc);
-	auto edges = [&edge_file] (typename T::time_point const & time, std::unordered_map<typename T::object, typename T::weight> const & totals) {
+	auto edges = [&edge_file, &begin, &end] (typename T::time_point const & time, std::unordered_map<typename T::object, typename T::weight> const & totals) {
 		for (auto const & i: totals)
 		{
 			edge_file << std::to_string (time.time_since_epoch ().count ()) << ',' << std::to_string (i.first) << ',' << std::to_string (i.second) << '\n';
 		}
 	};
-	agreement.scan (tally, typename T::time_point{}, T::time_point::max (), validators, edges);
+	agreement.scan (tally, begin, end, validators, edges);
 }
 
 TEST (consensus_validator, non_convertable)
@@ -1139,145 +1139,143 @@ TEST (consensus_perf, DISABLED_validate_1000)
 	}
 }
 
-using agreement_short_sys_t = nano::agreement<uint16_t, uniform_validators>;
+using agreement_short_sys_t = nano::agreement<bool, uniform_validators>;
+
+class shared
+{
+public:
+	class vote
+	{
+	public:
+		agreement_short_sys_t::object obj;
+		std::chrono::system_clock::time_point time;
+		agreement_short_sys_t::validators::key_type validator;
+	};
+
+	std::chrono::milliseconds W;
+	std::mutex mutex;
+	std::unordered_map<agreement_short_sys_t::object, std::tuple<agreement_short_sys_t::validators::key_type, agreement_short_sys_t::time_point, agreement_short_sys_t::time_point>> confirmed;
+	std::deque<vote> messages;
+	std::atomic<size_t> done{ 0 };
+
+	shared (std::chrono::milliseconds const & W) :
+	W{ W }
+	{
+	}
+	vote get ()
+	{
+		std::lock_guard<std::mutex> lock (mutex);
+		std::uniform_int_distribution<uint64_t> dist (0, messages.size () - 1);
+		auto index = dist (e1);
+		return messages[index];
+	}
+	void put (decltype(confirmed)::key_type const & obj, std::chrono::system_clock::time_point const & time, unsigned self)
+	{
+		std::lock_guard<std::mutex> lock (mutex);
+		messages.push_back ({ obj, time, self });
+	}
+	void confirm (decltype(confirmed)::key_type value, agreement_short_sys_t::validators::key_type validator, agreement_short_sys_t::time_point const & begin, agreement_short_sys_t::time_point const & end)
+	{
+		std::lock_guard<std::mutex> lock (mutex);
+		confirmed[value] = std::make_tuple (validator, begin, end);
+	}
+	void reset ()
+	{
+		std::lock_guard<std::mutex> lock{ mutex };
+		messages.clear ();
+		confirmed.clear ();
+		done = 0;
+	}
+};
+
+class consensus
+{
+public:
+	consensus (std::chrono::milliseconds const & W, uniform_validators & validators, shared & shared, unsigned self) :
+	W{ W },
+	validators{ validators },
+	shared{ shared },
+	self{ self },
+	item{ std::make_shared<agreement_short_sys_t> (W, dist (e1), std::make_shared<agreement_short_sys_t> (W, 0)) },
+	add{ [this] (decltype(shared.confirmed)::key_type const & obj, std::chrono::system_clock::time_point const & time) {
+		this->shared.put (obj, time, this->self);
+	} }
+	{
+	}
+	bool faulty () const
+	{
+		return self < ((validators.size () - 1) / 3);
+	}
+	void vote ()
+	{
+		if (!faulty ())
+		{
+			item->vote (add, validators);
+		}
+		else
+		{
+			add (dist (e1), std::chrono::system_clock::now ());
+		}
+	}
+	void action ()
+	{
+		unsigned weight_l;
+		std::lock_guard<std::mutex> lock (mutex);
+		auto message = shared.get ();
+		item->insert (message.obj, message.time, message.validator);
+		auto set = agreement.has_value ();
+		auto begin = message.time - W + std::chrono::milliseconds{ 1 };
+		auto end = message.time + W;
+		item->tally (begin, end, validators, [this, &weight_l, &begin, &end] (bool const & value, unsigned const & weight) {
+			if (!agreement.has_value ())
+			{
+				weight_l = weight;
+				agreement = value;
+				shared.confirm (agreement.value (), self, begin, end);
+				++shared.done;
+				//dump ("part", begin, end);
+			}
+		}, agreement_short_sys_t::fault_null, std::chrono::milliseconds{ 50 });
+		vote ();
+	}
+	void dump (std::string const & suffix, agreement_short_sys_t::time_point const & begin, agreement_short_sys_t::time_point const & end)
+	{
+		filedump (*item, validators, std::string ("edges_") + std::to_string (self) + '_' + suffix + ".csv", begin, end);
+	}
+	void reset ()
+	{
+		std::lock_guard<std::mutex> lock{ mutex };
+		agreement.reset ();
+	}
+	std::mutex mutex;
+	std::chrono::milliseconds const W;
+	std::uniform_int_distribution<uint64_t> dist{ 0, 1 };
+	uniform_validators & validators;
+	shared & shared;
+	unsigned self;
+	std::optional<bool> agreement;
+	std::shared_ptr<agreement_short_sys_t> item;
+	std::function<void(bool const & obj, std::chrono::system_clock::time_point const & time)> add;
+};
 
 bool fuzz_body ()
 {
 	std::chrono::milliseconds W{ 50 };
 	uniform_validators validators{ 4 };
-	class shared
-	{
-	public:
-		std::unordered_set<bool> confirmed;
-		class vote
-		{
-		public:
-			decltype(confirmed)::value_type obj;
-			std::chrono::system_clock::time_point time;
-			decltype(validators)::key_type validator;
-		};
-
-		std::chrono::milliseconds W;
-		std::mutex mutex;
-		std::deque<vote> messages;
-
-		shared (std::chrono::milliseconds const & W) :
-		W{ W }
-		{
-		}
-		vote get ()
-		{
-			std::lock_guard<std::mutex> lock (mutex);
-			auto bound = 4 * W;
-			while (messages.front ().time < messages.back ().time - bound)
-			{
-				messages.pop_front ();
-			}
-			std::uniform_int_distribution<uint64_t> dist (0, messages.size () - 1);
-			auto index = dist (e1);
-			return messages[index];
-		}
-		void put (decltype(confirmed)::value_type const & obj, std::chrono::system_clock::time_point const & time, unsigned self)
-		{
-			std::lock_guard<std::mutex> lock (mutex);
-			messages.push_back ({ obj, time, self });
-		}
-		void confirm (decltype(confirmed)::value_type value)
-		{
-			std::lock_guard<std::mutex> lock (mutex);
-			confirmed.insert (value);
-		}
-	};
 	std::uniform_int_distribution<uint64_t> dist (0, 1);
-	class consensus
-	{
-	public:
-		consensus (std::chrono::milliseconds const & W, uniform_validators & validators, shared & shared, unsigned self, std::atomic<size_t> & done) :
-		W{ W },
-		validators{ validators },
-		shared{ shared },
-		self{ self },
-		item{ std::make_shared<agreement_short_sys_t> (W, dist (e1), std::make_shared<agreement_short_sys_t> (W, 0)) },
-		add{ [this] (decltype(shared.confirmed)::value_type const & obj, std::chrono::system_clock::time_point const & time) {
-			this->shared.put (obj, time, this->self);
-		} },
-		done{ done }
-		{
-		}
-		bool faulty () const
-		{
-			return self < ((validators.size () - 1) / 3);
-		}
-		void vote ()
-		{
-			if (!faulty ())
-			{
-				item->vote (add, validators);
-			}
-			else
-			{
-				auto bound = 4 * W;
-				std::uniform_int_distribution<uint64_t> warp (-bound.count (), bound.count ());
-				add (dist (e1), std::chrono::system_clock::now () + std::chrono::milliseconds{ warp (e1) });
-			}
-		}
-		void action ()
-		{
-			unsigned weight_l;
-			std::lock_guard<std::mutex> lock (mutex);
-			auto message = shared.get ();
-			item->insert (message.obj, message.time, message.validator);
-			auto set = agreement.has_value ();
-			item->tally (message.time - W + std::chrono::milliseconds{ 1 }, message.time + W, validators, [this, &weight_l] (bool const & value, unsigned const & weight) {
-				weight_l = weight;
-				agreement = value;
-			}, agreement_short_sys_t::fault_null, std::chrono::milliseconds{ 51 });
-			if (!set && agreement.has_value ())
-			{
-				shared.confirm (agreement.value ());
-				++done;
-			}
-			auto now = std::chrono::system_clock::now ();
-			if (fuzz)
-			{
-				last = now;
-				vote ();
-			}
-		}
-		void dump ()
-		{
-			if (!faulty ())
-			{
-				filedump (*item, validators, std::string ("edges_") + std::to_string (self) + ".csv");
-			}
-		}
-		std::mutex mutex;
-		std::chrono::milliseconds const W;
-		std::uniform_int_distribution<uint64_t> dist{ 0, 1 };
-		uniform_validators & validators;
-		shared & shared;
-		unsigned self;
-		std::optional<bool> agreement;
-		std::shared_ptr<agreement_short_sys_t> item;
-		std::function<void(bool const & obj, std::chrono::system_clock::time_point const & time)> add;
-		std::atomic<size_t> & done;
-		std::chrono::system_clock::time_point last;
-		bool const fuzz{ true };
-	};
 	std::deque<std::thread> threads;
 	std::deque<consensus> agreements;
-	std::atomic<size_t> done{ 0 };
 	shared shared{ W };
 	for (decltype(validators)::key_type i = 0; i < validators.size (); ++i)
 	{
-		agreements.emplace_back (W, validators, shared, i, done);
+		agreements.emplace_back (W, validators, shared, i);
 		agreements.back ().vote ();
 	}
 	for (auto i = 0; i < std::thread::hardware_concurrency(); ++i)
 	{
-		threads.emplace_back ([&agreements, &done, &validators] () {
+		threads.emplace_back ([&agreements, &shared, &validators] () {
 			std::uniform_int_distribution<uint64_t> dist{ 0, validators.size () - 1 };
-			while (done < validators.size ())
+			while (shared.done < validators.size ())
 			{
 				agreements[dist (e1)].action ();
 			}
@@ -1289,9 +1287,12 @@ bool fuzz_body ()
 	auto error = shared.confirmed.size () != 1;
 	if (error)
 	{
-		std::for_each (agreements.begin (), agreements.end (), [] (consensus & item) {
-			item.dump ();
-		});
+		for (auto const &[value, info]: shared.confirmed)
+		{
+			auto const &[validator, begin, end] = info;
+			std::cerr << std::to_string (validator) << ',' << std::to_string (value) << std::endl;
+			agreements[validator].dump ("all", begin, end);
+		}
 	}
 	return error;
 }
@@ -1299,8 +1300,8 @@ bool fuzz_body ()
 TEST (consensus, fuzz)
 {
 	int success = 0, failure = 0;
-	for (auto i = 0; i < 2000; ++i)
-	//while (true)
+	//for (auto i = 0; i < 2000; ++i)
+	while (true)
 	{
 		if (fuzz_body ())
 		{
