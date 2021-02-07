@@ -32,7 +32,7 @@ for file in files:
 				last_time = time
 				samples = samples + 1
 				labels.append (time)
-				quorum.append (10)
+				quorum.append (3)
 			if value not in value_samples.keys ():
 				print (value)
 				new_samples = []

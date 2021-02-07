@@ -532,7 +532,7 @@ TEST (consensus_scan, one_file)
 	agreement.insert (3.0f, now2, 2);
 	agreement.insert (2.0f, now3, 3);
 	agreement.insert (3.0f, now3, 4);
-	filedump (agreement, validators, "edges.csv");
+	filedump (agreement, validators, std::filesystem::temp_directory_path () / "edges.csv");
  }
 
 TEST (consensus_validator, construction)
@@ -1227,6 +1227,7 @@ bool fuzz_body ()
 			std::lock_guard<std::mutex> lock (mutex);
 			auto message = shared.get ();
 			item->insert (message.obj, message.time, message.validator);
+			auto set = agreement.has_value ();
 			item->tally (message.time - W + std::chrono::milliseconds{ 1 }, message.time + W, validators, [this, &weight_l] (bool const & value, unsigned const & weight) {
 				weight_l = weight;
 				agreement = value;
@@ -1234,7 +1235,6 @@ bool fuzz_body ()
 			if (!set && agreement.has_value ())
 			{
 				shared.confirm (agreement.value ());
-				set = true;
 				++done;
 			}
 			auto now = std::chrono::system_clock::now ();
@@ -1260,7 +1260,6 @@ bool fuzz_body ()
 		std::optional<bool> agreement;
 		std::shared_ptr<agreement_short_sys_t> item;
 		std::function<void(bool const & obj, std::chrono::system_clock::time_point const & time)> add;
-		bool set{ false };
 		std::atomic<size_t> & done;
 		std::chrono::system_clock::time_point last;
 		bool const fuzz{ true };
@@ -1300,10 +1299,10 @@ bool fuzz_body ()
 TEST (consensus, fuzz)
 {
 	int success = 0, failure = 0;
-	//for (auto i = 0; i < 2000; ++i)
-	while (true)
+	for (auto i = 0; i < 2000; ++i)
+	//while (true)
 	{
-		if (fuzz_body())
+		if (fuzz_body ())
 		{
 			++failure;
 		}
