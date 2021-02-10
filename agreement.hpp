@@ -116,7 +116,7 @@ public:
 		{
 			return totals_m;
 		}
-		void clear ()
+		void reset ()
 		{
 			votes.clear ();
 			totals_m.clear ();
@@ -178,6 +178,11 @@ public:
 	agreement{ window, item }
 	{
 		parents.insert (parent);
+	}
+	void reset (object const & item)
+	{
+		time = time_point{};
+		last = item;
 	}
 	template<typename EDGE = decltype(edge_null), typename FAULT = decltype(fault_null)>
 	void scan (tally & tally, time_point const & begin, time_point const & end, validators const & validators, EDGE const & edge = edge_null, FAULT const & fault = fault_null)
@@ -250,7 +255,7 @@ public:
 	template<typename VoteFunction, typename FAULT = decltype(fault_null)>
 	time_point vote (VoteFunction const & vote, validators const & validators, time_point const & now = clock::now (), FAULT const & fault = fault_null)
 	{
-		votes.erase (votes.begin (), votes.upper_bound (now - W));
+		//votes.erase (votes.begin (), votes.upper_bound (now - W));
 		class tally tally;
 		scan (tally, now - W, now, validators, edge_null, fault);
 		auto const & [weight, object] = tally.max ();

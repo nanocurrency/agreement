@@ -171,7 +171,7 @@ TEST (consensus_slate, construction)
 	class agreement_u_t::tally tally;
 	ASSERT_TRUE (tally.empty ());
 	ASSERT_EQ (0, tally.total ());
-	tally.clear ();
+	tally.reset ();
 }
 
 // Test a single pulse
@@ -1196,7 +1196,7 @@ public:
 	validators{ validators },
 	shared{ shared },
 	self{ self },
-	item{ std::make_shared<agreement_short_sys_t> (W, dist (e1), std::make_shared<agreement_short_sys_t> (W, 0)) },
+	item{ std::make_shared<agreement_short_sys_t> (W, 0, std::make_shared<agreement_short_sys_t> (W, 0)) },
 	add{ [this] (decltype(shared.confirmed)::key_type const & obj, std::chrono::system_clock::time_point const & time) {
 		this->shared.put (obj, time, this->self);
 	} }
@@ -1225,18 +1225,19 @@ public:
 		auto message = shared.get ();
 		item->insert (message.obj, message.time, message.validator);
 		auto set = agreement.has_value ();
-		auto begin = message.time - W + std::chrono::milliseconds{ 1 };
-		auto end = message.time + W;
+		auto width = 2 * W;
+		auto begin = message.time - width + one;
+		auto end = message.time + width;
 		item->tally (begin, end, validators, [this, &weight_l, &begin, &end] (bool const & value, unsigned const & weight) {
 			if (!agreement.has_value ())
 			{
 				weight_l = weight;
 				agreement = value;
-				shared.confirm (agreement.value (), self, begin, end);
+				shared.confirm (agreement.value (), self, begin, end); 
 				++shared.done;
 				//dump ("part", begin, end);
 			}
-		}, agreement_short_sys_t::fault_null, std::chrono::milliseconds{ 50 });
+		}, agreement_short_sys_t::fault_null, width + one);
 		vote ();
 	}
 	void dump (std::string const & suffix, agreement_short_sys_t::time_point const & begin, agreement_short_sys_t::time_point const & end)
@@ -1247,6 +1248,7 @@ public:
 	{
 		std::lock_guard<std::mutex> lock{ mutex };
 		agreement.reset ();
+		item->reset (dist (e1));
 		vote ();
 	}
 	std::mutex mutex;
@@ -1260,7 +1262,35 @@ public:
 	std::function<void(bool const & obj, std::chrono::system_clock::time_point const & time)> add;
 };
 
-bool fuzz_body ()
+class Barrier {
+public:
+	explicit Barrier(std::size_t iCount) :
+	  mThreshold(iCount),
+	  mCount(iCount),
+	  mGeneration(0) {
+	}
+
+	void Wait() {
+		std::unique_lock<std::mutex> lLock{mMutex};
+		auto lGen = mGeneration;
+		if (!--mCount) {
+			mGeneration++;
+			mCount = mThreshold;
+			mCond.notify_all();
+		} else {
+			mCond.wait(lLock, [this, lGen] { return lGen != mGeneration; });
+		}
+	}
+
+private:
+	std::mutex mMutex;
+	std::condition_variable mCond;
+	std::size_t mThreshold;
+	std::size_t mCount;
+	std::size_t mGeneration;
+};
+
+TEST (consensus, fuzz)
 {
 	std::chrono::milliseconds W{ 50 };
 	uniform_validators validators{ 4 };
@@ -1268,50 +1298,57 @@ bool fuzz_body ()
 	std::deque<std::thread> threads;
 	std::deque<consensus> agreements;
 	shared shared{ W };
-	for (decltype(validators)::key_type i = 0; i < validators.size (); ++i)
+	auto init = [&agreements, &validators, &W, &shared] () {
+		agreements.clear ();
+		for (decltype(validators)::key_type i = 0; i < validators.size (); ++i)
+		{
+			agreements.emplace_back (W, validators, shared, i);
+		}
+	};
+	init ();
+	auto thread_count = std::thread::hardware_concurrency();
+	Barrier barrier{ thread_count + 1 };
+	for (auto i = 0; i < thread_count; ++i)
 	{
-		agreements.emplace_back (W, validators, shared, i);
-	}
-	for (auto i = 0; i < std::thread::hardware_concurrency(); ++i)
-	{
-		threads.emplace_back ([&agreements, &shared, &validators] () {
-			std::uniform_int_distribution<uint64_t> dist{ 0, validators.size () - 1 };
-			while (shared.done < validators.size ())
+		threads.emplace_back ([&agreements, &shared, &validators, &barrier] () {
+			//for (auto i = 0; i < 2000; ++i)
+			while (true)
 			{
-				agreements[dist (e1)].action ();
+				std::uniform_int_distribution<uint64_t> dist{ 0, validators.size () - 1 };
+				while (shared.done < validators.size ())
+				{
+					agreements[dist (e1)].action ();
+				}
+				barrier.Wait ();
+				barrier.Wait ();
 			}
 		});
 	}
-	std::for_each (threads.begin (), threads.end (), [] (std::thread & thread) {
-		thread.join ();
-	});
-	auto error = shared.confirmed.size () != 1;
-	if (error)
-	{
-		for (auto const &[value, info]: shared.confirmed)
-		{
-			auto const &[validator, begin, end] = info;
-			std::cerr << std::to_string (validator) << ',' << std::to_string (value) << std::endl;
-			agreements[validator].dump ("all", begin, end);
-		}
-	}
-	return error;
-}
-
-TEST (consensus, fuzz)
-{
 	int success = 0, failure = 0;
-	//for (auto i = 0; i < 2000; ++i)
 	while (true)
 	{
-		if (fuzz_body ())
+		barrier.Wait ();
+		auto error = shared.confirmed.size () != 1;
+		if (error)
 		{
 			++failure;
+			for (auto const &[value, info]: shared.confirmed)
+			{
+				auto const &[validator, begin, end] = info;
+				std::cerr << std::to_string (validator) << ',' << std::to_string (value) << std::endl;
+				agreements[validator].dump ("all", begin, end);
+			}
 		}
 		else
 		{
 			++success;
 		}
 		std::cerr << success << ' ' << failure << std::endl;
+		shared.reset ();
+		init ();
+		barrier.Wait ();
 	}
+	std::for_each (threads.begin (), threads.end (), [] (std::thread & thread) {
+		thread.join ();
+	});
 }
