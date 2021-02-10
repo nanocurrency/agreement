@@ -1233,7 +1233,7 @@ public:
 			{
 				weight_l = weight;
 				agreement = value;
-				shared.confirm (agreement.value (), self, begin, end); 
+				shared.confirm (agreement.value (), self, begin, end);
 				++shared.done;
 				//dump ("part", begin, end);
 			}
