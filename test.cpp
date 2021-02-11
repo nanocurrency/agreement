@@ -1226,8 +1226,8 @@ public:
 		item->insert (message.obj, message.time, message.validator);
 		auto set = agreement.has_value ();
 		auto width = 2 * W;
-		auto begin = message.time - width + one;
-		auto end = message.time + width;
+		auto begin = message.time - std::max (W, width) + one;
+		auto end = message.time + std::max (W, width);
 		item->tally (begin, end, validators, [this, &weight_l, &begin, &end] (bool const & value, unsigned const & weight) {
 			if (!agreement.has_value ())
 			{
