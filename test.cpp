@@ -4,6 +4,7 @@
 
 #include <atomic>
 #include <array>
+#include <condition_variable>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -170,7 +171,6 @@ TEST (consensus_slate, construction)
 {
 	class agreement_u_t::tally tally;
 	ASSERT_TRUE (tally.empty ());
-	ASSERT_EQ (0, tally.total ());
 	tally.reset ();
 }
 
@@ -183,15 +183,12 @@ TEST (consensus_slate, insert_erase)
 	ASSERT_EQ (0, weight1);
 	ASSERT_EQ (0.0, object1);
 	auto now = incrementing_clock::now ();
-	ASSERT_EQ (0, tally.total ());
 	tally.rise (now, 0, 1.0, validators);
-	ASSERT_EQ (1, tally.total ());
 	auto const & [weight2, object2] = tally.max ();
 	ASSERT_EQ (1, weight2);
 	ASSERT_EQ (1.0, object2);
 	tally.fall (now, 0, 1.0);
 	ASSERT_TRUE (tally.empty ());
-	ASSERT_EQ (0, tally.total ());
 }
 
 // Test 2 overlapping pulses by the same validator
@@ -1225,7 +1222,7 @@ public:
 		auto message = shared.get ();
 		item->insert (message.obj, message.time, message.validator);
 		auto set = agreement.has_value ();
-		auto width = 2 * W;
+		auto width = 0 * W;
 		auto begin = message.time - std::max (W, width) + one;
 		auto end = message.time + std::max (W, width);
 		item->tally (begin, end, validators, [this, &weight_l, &begin, &end] (bool const & value, unsigned const & weight) {

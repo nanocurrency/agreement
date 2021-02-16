@@ -43,7 +43,6 @@ public:
 
 		using vote = typename decltype(votes)::value_type;
 	private:
-		weight total_m{};
 		template<typename OP>
 		void sort (weight const & weight, object const & object, OP op)
 		{
@@ -62,7 +61,6 @@ public:
 			rank.insert (std::make_pair (weight_new, object));
 			assert (totals_m.size () == rank.size ());
 			weight_object = weight_new;
-			total_m = op (total_m, weight);
 		}
 	public:
 		void fall (time_point const & time, validator const & validator, object const & object)
@@ -91,8 +89,8 @@ public:
 			}
 			else
 			{
-				sort (weight_l, current, std::minus<weight> ());
-				weight_l = 0;
+				//sort (weight_l, current, std::minus<weight> ());
+				//weight_l = 0;
 				fault (validator);
 			}
 		}
@@ -110,10 +108,6 @@ public:
 			}
 			return result;
 		}
-		weight total () const
-		{
-			return total_m;
-		}
 		decltype (totals_m) totals () const
 		{
 			return totals_m;
@@ -123,7 +117,6 @@ public:
 			votes.clear ();
 			totals_m.clear ();
 			rank.clear ();
-			total_m = weight{};
 		}
 	};
 	
