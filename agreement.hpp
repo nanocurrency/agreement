@@ -91,6 +91,8 @@ public:
 			}
 			else
 			{
+				sort (weight_l, current, std::minus<weight> ());
+				weight_l = 0;
 				fault (validator);
 			}
 		}
@@ -260,7 +262,7 @@ public:
 		scan (tally, now - W, now, validators, edge_null, fault);
 		auto const & [weight, object] = tally.max ();
 		auto result = now + W;
-		if (tally.total () >= validators.quorum () && last != object)
+		if (last != object)
 		{
 			auto when = replaceable ();
 			if (when <= now)
