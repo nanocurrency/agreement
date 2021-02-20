@@ -30,8 +30,9 @@ private:
 	std::multimap<time_point, std::pair<validator, object>> votes;
 	std::unordered_set<std::shared_ptr<agreement<object, validators, clock, duration>>> parents;
 	time_point time;
+public:
 	object last;
-	
+
 	using child = typename decltype(parents)::value_type;
 public:
 	// Transforms a sequence of rising and falling edges to an ordered weighted sum map
@@ -89,8 +90,8 @@ public:
 			}
 			else
 			{
-				//sort (weight_l, current, std::minus<weight> ());
-				//weight_l = 0;
+				sort (weight_l, current, std::minus<weight> ());
+				weight_l = 0;
 				fault (validator);
 			}
 		}

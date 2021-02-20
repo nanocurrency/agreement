@@ -1206,11 +1206,8 @@ public:
 	}
 	void vote ()
 	{
-		if (!faulty ())
-		{
-			item->vote (add, validators);
-		}
-		else
+		item->vote (add, validators);
+		if (faulty ())
 		{
 			add (dist (e1), std::chrono::system_clock::now ());
 		}
@@ -1222,7 +1219,8 @@ public:
 		auto message = shared.get ();
 		item->insert (message.obj, message.time, message.validator);
 		auto set = agreement.has_value ();
-		auto width = 0 * W;
+		auto fraction = 1 << 30;
+		auto width = W - 0 * one;
 		auto begin = message.time - std::max (W, width) + one;
 		auto end = message.time + std::max (W, width);
 		item->tally (begin, end, validators, [this, &weight_l, &begin, &end] (bool const & value, unsigned const & weight) {
@@ -1245,8 +1243,11 @@ public:
 	{
 		std::lock_guard<std::mutex> lock{ mutex };
 		agreement.reset ();
-		item->reset (dist (e1));
-		vote ();
+		bool val = dist (e1);
+		auto now = std::chrono::system_clock::now ();
+		item->reset (val);
+		item->insert (val, now, self);
+		shared.put (val, now, self);
 	}
 	std::mutex mutex;
 	std::chrono::milliseconds const W;
@@ -1300,7 +1301,9 @@ TEST (consensus, fuzz)
 		for (decltype(validators)::key_type i = 0; i < validators.size (); ++i)
 		{
 			agreements.emplace_back (W, validators, shared, i);
+			//std::cerr << std::to_string (agreements.back ().item->last) << ' ';
 		}
+		//std::cerr << '\n';
 	};
 	init ();
 	auto thread_count = std::thread::hardware_concurrency();
@@ -1322,17 +1325,22 @@ TEST (consensus, fuzz)
 		});
 	}
 	int success = 0, failure = 0;
-	while (true)
+	for (auto i = 0; i < 10000; ++i)
 	{
 		barrier.Wait ();
 		auto error = shared.confirmed.size () != 1;
+		for (auto const & i: agreements)
+		{
+			//std::cerr << std::to_string (i.item->last) << ' ';
+		}
+		//std::cerr << '\n';
 		if (error)
 		{
 			++failure;
 			for (auto const &[value, info]: shared.confirmed)
 			{
 				auto const &[validator, begin, end] = info;
-				std::cerr << std::to_string (validator) << ',' << std::to_string (value) << std::endl;
+				//std::cerr << std::to_string (validator) << ',' << std::to_string (value) << std::endl;
 				agreements[validator].dump ("all", begin, end);
 			}
 		}
@@ -1340,7 +1348,10 @@ TEST (consensus, fuzz)
 		{
 			++success;
 		}
-		std::cerr << success << ' ' << failure << std::endl;
+		if ((success + failure) % 10 == 0)
+		{
+			std::cerr << success << ' ' << failure << '\n';
+		}
 		shared.reset ();
 		init ();
 		barrier.Wait ();
