@@ -1220,7 +1220,7 @@ public:
 		item->insert (message.obj, message.time, message.validator);
 		auto set = agreement.has_value ();
 		auto fraction = 1 << 30;
-		auto width = W - 0 * one;
+		auto width = 2 * W - 0 * one;
 		auto begin = message.time - std::max (W, width) + one;
 		auto end = message.time + std::max (W, width);
 		item->tally (begin, end, validators, [this, &weight_l, &begin, &end] (bool const & value, unsigned const & weight) {
@@ -1325,7 +1325,7 @@ TEST (consensus, fuzz)
 		});
 	}
 	int success = 0, failure = 0;
-	for (auto i = 0; i < 10000; ++i)
+	for (auto i = 0; i < 1000000000; ++i)
 	{
 		barrier.Wait ();
 		auto error = shared.confirmed.size () != 1;
